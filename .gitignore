@@ -1,4 +1,6 @@
-data/*
+*.pcd
+*.bin
+*.csv
 
 .vscode/*
 
