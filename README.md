@@ -46,3 +46,12 @@ pip install cupy-cuda11x
 # based on my env
 pip install cupy-cuda113
 ```
+
+## Others
+
+Some hints about point cloud data set:
+```bash
+print(f"{points.shape}")
+# [1394189,4](lecai) [25380, 4](16-velodyne) 
+# 4: (x, y, z, intensity)
+```
