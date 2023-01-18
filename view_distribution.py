@@ -8,25 +8,57 @@
 import open3d as o3d
 import numpy as np
 import cupy as cp
+from collections import defaultdict
 
-from utils import load_view_point, save_view_point
+from utils import load_view_point, save_view_point, bresenham
 from utils.global_def import *
-resolution = 0.5
-print("Testing IO for point cloud ...")
+
+resolution = 1
+range_m = 5
+
+
 TIC()
 points = np.fromfile("data/bin/test.bin", dtype=np.float32).reshape(-1, 4)
 # points = np.fromfile("data/bin/KTH- Setup 001_SPATIAL_SUBSAMPLED.bin", dtype=np.float32).reshape(-1, 4)
-est_cen = np.mean(points[...], axis=0)
-# est_cen[2] = 0
-# new_pts = points - est_cen
-# est_cen = np.mean(new_pts[...], axis=0)
-# est_cen[2] = 0
-# print(f"{est_cen}")
+# the map is originally referenced in the GPS global frame, I offset everything by (-154100.0, -6581400.0, 0.0)
+# offset_lc = [-154100.0, -6581400.0, 0.0]
+# leica offset on xyz in csv
+np.insert(points, 0, np.array(0,0,0,-1))
+TOC("Numpy read pt")
 
-TOC(chat="Numpy read pt")
+## 1. REMOVE GROUND!!!
 
-idx = np.divide((points[...,:3] - est_cen[...,:3]),resolution).astype(int)
-# TODO 保存成 xy 标准的matrix 255x255x5 (4: 2*2 gaussian, 1: pts id)， 这样方便直接对准
+rmg_pts = points
+TOC("Remove Ground pts")
+
+## 2. Voxelize STACK TO 2D
+idxy = (np.divide(rmg_pts[...,:2],resolution) + (range_m/resolution)/2).astype(int)
+
+dim_2d = (int)(range_m/resolution)
+M_2d = np.zeros((dim_2d, dim_2d))
+
+twoD2ptindex = defaultdict(lambda  : defaultdict(list))
+pts1idxy = []
+for i, ptidxy in enumerate(idxy):
+    if ptidxy[0] < dim_2d and ptidxy[1]<dim_2d and ptidxy[1]>0 and ptidxy[0]>0:
+        M_2d[ptidxy[0]][ptidxy[1]] = M_2d[ptidxy[0]][ptidxy[1]] + 1
+        pt1xy = f"{ptidxy[0]}.{ptidxy[1]}"
+        if pt1xy not in pts1idxy:
+            pts1idxy.append(pt1xy)
+        twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
+        # print(f"id: {i}, IN, xy {ptidxy[0]},{ptidxy[1]}")
+TOC("Stack to 2d array")
+
+## 4. Ray Tracking in M_2d
+RayT_2d = np.zeros((dim_2d, dim_2d))
+for eid in pts1idxy:
+    x1 = int(eid.split('.')[0])
+    y1 = int(eid.split('.')[1])
+    grid2one =bresenham(dim_2d//2,dim_2d//2, x1,y1)
+    # print(grid2one)
+    for sidxy in grid2one:
+        RayT_2d[sidxy[0]][sidxy[1]] = 1
+TOC("Ray Casting")
 # cpoints = cp.fromfile("data/bin/KTH- Setup 001_SPATIAL_SUBSAMPLED.bin", dtype=cp.float32).reshape(-1, 4)
 # est_cen = cp.mean(cpoints[...], axis=0)
 # print(f"{est_cen}")
@@ -45,7 +77,5 @@ idx = np.divide((points[...,:3] - est_cen[...,:3]),resolution).astype(int)
 # view_thing = [pts, voxels]
 # # save_view_point(view_thing, "data/lecai_viewpoint.json") # make sure you are quit as click the `q` button
 # load_view_point(view_thing, "data/lecai_viewpoint.json")
-
-
 
 print("All success")

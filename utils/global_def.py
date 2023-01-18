@@ -8,7 +8,7 @@
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
 Python Timer from https://stackoverflow.com/a/26695514/9281669
-Modified a little by Kin (https://kin-zhang.github.io/)
+Modified a little by Kin
 '''
 import time
 
@@ -24,7 +24,7 @@ def TicTocGenerator():
 TicToc = TicTocGenerator() # create an instance of the TicTocGen generator
 
 # This will be the main function through which we define both tic() and toc()
-def TOC(tempBool=True, chat = "Default"):
+def TOC(chat = "Default", tempBool=True):
     # Prints the time difference yielded by generator instance TicToc
     tempTimeInterval = next(TicToc)
     if tempBool:
@@ -33,7 +33,7 @@ def TOC(tempBool=True, chat = "Default"):
 
 def TIC():
     # Records a time in TicToc, marks the beginning of a time interval
-    TOC(False)
+    TOC(tempBool=False)
 
 class bc:
     HEADER = '\033[95m'
