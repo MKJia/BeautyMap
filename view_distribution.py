@@ -74,8 +74,8 @@ TOC("Ray Casting")
 # voxels_all= voxels.get_voxels()
 # print(f"voxels' origin Coorinate of the origin point: {voxels.origin}, len of voxels: {len(voxels_all)}")
 # # o3d.visualization.draw_geometries([voxels])
-# view_thing = [pts, voxels]
-# # save_view_point(view_thing, "data/lecai_viewpoint.json") # make sure you are quit as click the `q` button
-# load_view_point(view_thing, "data/lecai_viewpoint.json")
+view_thing = [pts, voxels]
+save_view_point(view_thing, "data/lecai_viewpoint.json") # make sure you are quit as click the `q` button
+load_view_point(view_thing, "data/lecai_viewpoint.json")
 
 print("All success")
