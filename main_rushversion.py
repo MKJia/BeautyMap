@@ -19,7 +19,9 @@ from scipy.special import rel_entr
 resolution = 1 # default 16-LiDAR, 1 meter
 range_m = 10 # default 16-LiDAR, 20 meter
 RANDOM_SEED = 10
-
+X_AXIS = 0 # ground plane x
+Y_AXIS = 1 # ground plane y
+Z_AXIS = 2
 class o3d_point:
     def __init__(self,points):
         self.pts = o3d.geometry.PointCloud()
@@ -36,7 +38,9 @@ class o3d_point:
         print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
         inlier_cloud = self.pts.select_by_index(inliers)
         self.rmg_pts = self.pts.select_by_index(inliers, invert=True)
+        # save_view_point([inlier_cloud.paint_uniform_color([1.0, 0, 0]), self.rmg_pts], "data/TPB.json")
         load_view_point([inlier_cloud.paint_uniform_color([1.0, 0, 0]), self.rmg_pts], "data/TPB.json")
+        
         TOC("REMOVE GROUND")
     def view_compare(self, inlier, outlier):
         inlier.paint_uniform_color([1.0, 0, 0])
@@ -50,27 +54,25 @@ class process_pts:
         ## 0. Read Point Cloud
         TIC()
         self.points = np.fromfile(file, dtype=np.float32).reshape(-1, 4)
-
         # point the center points
         np.insert(self.points, 0, np.array([0,0,0,-1]),axis=0)
-
         TOC("Numpy read pt")
 
         self.o3d_pts = o3d_point(self.points)
         self.o3d_pts.transform(T_MATRIX)
         self.o3d_pts.removeGround()
-
         self.rmg_pts = np.asarray(self.o3d_pts.rmg_pts.points)
         self.range_m = range_m
         self.resolution = resolution
         self.dim_2d = (int)(range_m/resolution)
         self.twoD2ptindex = defaultdict(lambda  : defaultdict(list))
         self.binT_2d = np.zeros((self.dim_2d, self.dim_2d))
+        TOC("Initial steps")
 
     def all_process(self, center):
 
         ## 2. Voxelize STACK TO 2D
-        idxy = (np.divide(self.rmg_pts[...,:2] - center[:2],self.resolution) + (self.range_m/self.resolution)/2).astype(int)
+        idxy = (np.divide(self.rmg_pts[...,[X_AXIS,Y_AXIS]] - center[[X_AXIS,Y_AXIS]],self.resolution) + (self.range_m/self.resolution)/2).astype(int)
 
         M_2d = np.zeros((self.dim_2d, self.dim_2d))
         
@@ -83,7 +85,7 @@ class process_pts:
                     self.pts1idxy.append(pt1xy)
                     self.binT_2d[ptidxy[0]][ptidxy[1]] = 1
                 self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
-        TOC("Stack to 2d array")
+        TOC("Stack to 2D")
 
     def rayT_2d(self):
         ## 4. Ray Tracking in M_2d
@@ -99,7 +101,7 @@ class process_pts:
 
 def calGMM(data):
     
-    if len(data)==0:
+    if len(data)<=1:
         gm= GaussianMixture(n_components=2, random_state=RANDOM_SEED).fit((-1*np.ones((100,1))).reshape(-1,1))
     else:
         # data = np.repeat(data, 2).reshape(-1,1)
@@ -118,7 +120,7 @@ def gmm_kl(gmm_p, gmm_q, n_samples=10**3):
 import pandas as pd
 df = pd.read_csv('data/TPB_poses_lidar2body.csv')
 pose = df.values[100][2:]
-wxyz = np.array([pose[-1],pose[3],pose[5],pose[6]])
+wxyz = np.array([pose[6],pose[3],pose[4],pose[5]])
 T_Q = np.eye(4)
 T_Q[:3,:3] = quat2mat(wxyz)
 T_Q[:3,-1]= np.array([pose[0],pose[1],pose[2]])
@@ -126,19 +128,21 @@ T_Q[:3,-1]= np.array([pose[0],pose[1],pose[2]])
 Query_ = process_pts("data/bin/TPB_000100.bin", range_m, resolution, T_MATRIX=T_Q)
 PrMap_ = process_pts("data/bin/TPB_global_map.bin", range_m, resolution)
 
+# debug: make sure the aglignment is corrected
+# Query_.o3d_pts.view_compare(Query_.o3d_pts.pts, PrMap_.o3d_pts.pts)
+
 Query_.all_process(Query_.points[0,:])
 PrMap_.all_process(Query_.points[0,:])
 
 Query2d = Query_.rayT_2d()
-
-KL_Matrix = M_2d = np.zeros((Query_.dim_2d, Query_.dim_2d))
-# # ## 6. The grid have one calculate the KL Diversity
+KL_Matrix = np.zeros((Query_.dim_2d, Query_.dim_2d))
+## 6. The grid have one calculate the KL Diversity
 Grids_Trigger_KL = list(zip(*np.where(Query2d.dot(PrMap_.binT_2d) == 1)))
 for item in Grids_Trigger_KL:
     Q_pts_id = Query_.twoD2ptindex[item[0]][item[1]]
     M_pts_id = PrMap_.twoD2ptindex[item[0]][item[1]]
-    Q_Prob = calGMM(Query_.points[Q_pts_id][:,3].reshape(-1,1)) # Q_Prob: u1, u2, s1, s2 which is 2 gaussian
-    M_Prob = calGMM(PrMap_.points[M_pts_id][:,3].reshape(-1,1))
+    Q_Prob = calGMM(Query_.points[Q_pts_id][:,Z_AXIS].reshape(-1,1)) # Q_Prob: u1, u2, s1, s2 which is 2 gaussian
+    M_Prob = calGMM(PrMap_.points[M_pts_id][:,Z_AXIS].reshape(-1,1))
     KL_Matrix[item[0]][item[1]] = gmm_kl(Q_Prob, M_Prob)
 
 if len(Grids_Trigger_KL)!=0:
