@@ -11,14 +11,29 @@ To improve the ERASOR in speed and remove theory in math. Check [Kin's notion pa
 
 
 
-**<u>Test computer and System:</u>**
+**<u>Test computer and System (Windows and Ubuntu):</u>**
 
 Desktop setting: i9-12900KF, GPU 3090, CUDA 11.3, cuDNN 8.2.1
 
 System setting: Ubuntu 20.04, ROS noetic (**<u>Python 3.8</u>**)
 
+---
+
+Desktop setting: i7-9750H, GPU 1660Ti
+
+System setting: Windows 10 **<u>Python 3.8</u>**
 
 
+## Install
+install dependencies libraries
+```bash
+pip install -r requirments.txt
+```
+
+run debug data (Three people behind the car):
+```bash
+python main_rushversion.py
+```
 
 
 

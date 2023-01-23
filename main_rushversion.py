@@ -7,7 +7,6 @@
 
 import open3d as o3d
 import numpy as np
-import cupy as cp
 
 from collections import defaultdict
 from sklearn.mixture import GaussianMixture
