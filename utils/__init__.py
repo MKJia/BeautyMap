@@ -59,63 +59,44 @@ def quat2mat(quat):
     mat[..., 2, 2] = 1.0 - (xX + yY)
     return np.where((Nq > _FLOAT_EPS)[..., np.newaxis, np.newaxis], mat, np.eye(3))
 
-# https://github.com/daQuincy/Bresenham-Algorithm/blob/master/bresenham.py
-def bresenham(x0,y0,x1,y1):
-    """
-    Bresenham's Line Generation Algorithm
-    https://www.youtube.com/watch?v=76gp2IAazV4
-    """
-    line_pixel = []
-    line_pixel.append((x0,y0))
+def RayOutside(x0, y0, x1, y1):
+    dim = int(x0*2)
+    rayLists = []
+    deltaY = y1-y0
+    deltaX = x1-x0
 
-    # step 2 calculate difference
-    dx = abs(x1 - x0)
-    dy = abs(y1 - y0)
-    if dx==0:
-        for i in range(dy):
-            line_pixel.append([x0,y0+i])
-        return line_pixel
-    m = dy/dx
-    
-    # step 3 perform test to check if pk < 0
-    flag = True
-    
-    step = 1
-    if x0>x1 or y0>y1:
-        step = -1
-
-    mm = False   
-    if m < 1:
-        x0, x1 ,y0 ,y1 = y0, y1, x0, x1
-        dx = abs(x1 - x0)
-        dy = abs(y1 - y0)
-        mm = True
-        
-    p0 = 2*dx - dy
-    x = x0
-    y = y0
-    
-    for i in range(abs(y1-y0)):
-        if flag:
-            x_previous = x0
-            p_previous = p0
-            p = p0
-            flag = False
+    if deltaX==0 or deltaY==0:
+        print("line")
+    else:
+        xi = x1
+        yi = y1
+        slope = deltaY/deltaX
+        # 第一 三象限
+        if slope>0:
+            minusO = -1 if deltaX<0 else 1 # 第三象限  x y 都需要相减
+            if slope>1: # y 增长速度更快
+                while 0<yi<dim:
+                    rayLists.append([int(xi),int(yi)])
+                    yi = yi + 1*minusO
+                    xi = x0 + (yi-y0)/slope
+                    # yi = slope*(xi-x0) + y0
+            else:
+                while 0<xi<dim:
+                    rayLists.append([int(xi),int(yi)])
+                    xi = xi + 1*minusO
+                    yi = slope*(xi-x0) + y0
+        # 第二 四象限
         else:
-            x_previous = x
-            p_previous = p
-            
-        if p >= 0:
-            x = x + step
-
-        p = p_previous + 2*dx -2*dy*(abs(x-x_previous))
-        y = y + 1
-        
-        if mm:
-            line_pixel.append([y,x])
-        else:
-            line_pixel.append([x,y])
-            
-    line_pixel = np.array(line_pixel).astype(int)
-    
-    return line_pixel
+            minusY = 1 if deltaX<0 else -1 # y+1
+            minusX = 1 if deltaY<0 else -1 # x-1
+            if abs(slope)>1: # y 增长速度更快
+                while 0<yi<dim:
+                    rayLists.append([int(xi),int(yi)])
+                    yi = yi + 1*minusY
+                    xi = x0 + (yi-y0)/slope
+            else:
+                while 0<xi<dim:
+                    rayLists.append([int(xi),int(yi)])
+                    xi = xi + 1*minusX
+                    yi = slope*(xi-x0) + y0
+    return rayLists

@@ -23,6 +23,19 @@ Desktop setting: i7-9750H, GPU 1660Ti
 
 System setting: Windows 10 **<u>Python 3.8</u>**
 
+---
+
+Desktop setting: Apple M2
+
+System setting: MacOS 13.0.1 **<u>Python 3.9</u>**
+
+Open3d version must be 15.1 otherwise [issue here](https://github.com/isl-org/Open3D/issues/1421#issuecomment-1402746225)
+
+```bash
+brew install libomp
+pip3 install -r requirments.txt
+pip3 install open3d==0.15.1
+```
 
 ## Install
 install dependencies libraries
@@ -35,7 +48,10 @@ run debug data (Three people behind the car):
 python main_rushversion.py
 ```
 
+rush version demo:
+Blue is global prior map (Cut a little bit for fast debug), Red is points want to delete, Black is Query Frame Point Cloud
 
+![](assets/RushVersion_Demo.png)
 
 ## Others
 
