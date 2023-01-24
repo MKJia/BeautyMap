@@ -170,7 +170,7 @@ axs[0,1].imshow(PrMap_.binT_2d, cmap='hot', interpolation='nearest')
 axs[0,1].set_title('Prior Map bin 2d')
 axs[1,0].imshow(Query_.binT_2d, cmap='hot', interpolation='nearest')
 axs[1,0].set_title('Query Map bin 2d')
-axs[1,1].imshow(KL_Matrix, cmap='hot', interpolation='nearest')
+axs[1,1].imshow(np.clip(KL_Matrix, 0, 10), cmap='hot', interpolation='nearest')
 axs[1,1].set_title('KL Matrix after normalization')
 plt.show()
 
