@@ -10,12 +10,14 @@ import numpy as np
 
 from collections import defaultdict
 from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import normalize
 
 from utils import load_view_point, save_view_point, bresenham, quat2mat
 from utils.global_def import *
 from scipy.special import rel_entr
+import matplotlib.pyplot as plt
 
-resolution = 1 # default 16-LiDAR, 1 meter
+resolution = 0.5 # default 16-LiDAR, 1 meter
 range_m = 10 # default 16-LiDAR, 20 meter
 RANDOM_SEED = 10
 X_AXIS = 0 # ground plane x
@@ -30,20 +32,28 @@ class o3d_point:
         self.pts.transform(T_MATRIX)
     def removeGround(self):
         # 1. Remove the ground points (TODO better ground remove!!! HERE TODO)
-        plane_model, inliers = self.pts.segment_plane(distance_threshold=0.1,
-                                                ransac_n=16,
-                                                num_iterations=1000)
-        [a, b, c, d] = plane_model
-        print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
+        # plane_model, inliers = self.pts.segment_plane(distance_threshold=0.1,
+        #                                         ransac_n=16,
+        #                                         num_iterations=1000)
+        # [a, b, c, d] = plane_model
+        # print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
+
+        inliers = np.transpose((np.asarray(self.pts.points)[:,2]<=0).nonzero())
+        
         inlier_cloud = self.pts.select_by_index(inliers)
         self.rmg_pts = self.pts.select_by_index(inliers, invert=True)
         # save_view_point([inlier_cloud.paint_uniform_color([1.0, 0, 0]), self.rmg_pts], "data/TPB.json")
         load_view_point([inlier_cloud.paint_uniform_color([1.0, 0, 0]), self.rmg_pts], "data/TPB.json")
         
         TOC("REMOVE GROUND")
-    def view_compare(self, inlier, outlier):
+    def view_compare(self, inlier, outlier, others=None):
+        view_things = [outlier]
+        if others is not None:
+            others.paint_uniform_color([0.0, 0.0, 0.0])
+            view_things.append(others)
         inlier.paint_uniform_color([1.0, 0, 0])
-        load_view_point([inlier, outlier], "data/TPB.json")
+        view_things.append(inlier)
+        load_view_point(view_things, "data/TPB.json")
     def view(self,pts):
         o3d.visualization.draw_geometries([pts])
         
@@ -63,7 +73,7 @@ class process_pts:
         self.rmg_pts = np.asarray(self.o3d_pts.rmg_pts.points)
         self.range_m = range_m
         self.resolution = resolution
-        self.dim_2d = (int)(range_m/resolution)
+        self.dim_2d = (int)(range_m/resolution) + 1
         self.twoD2ptindex = defaultdict(lambda  : defaultdict(list))
         self.binT_2d = np.zeros((self.dim_2d, self.dim_2d))
         TOC("Initial steps")
@@ -73,17 +83,19 @@ class process_pts:
         ## 2. Voxelize STACK TO 2D
         idxy = (np.divide(self.rmg_pts[...,[X_AXIS,Y_AXIS]] - center[[X_AXIS,Y_AXIS]],self.resolution) + (self.range_m/self.resolution)/2).astype(int)
 
-        M_2d = np.zeros((self.dim_2d, self.dim_2d))
+        self.M_2d = np.zeros((self.dim_2d, self.dim_2d))
         
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
             if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>0 and ptidxy[0]>0:
-                M_2d[ptidxy[0]][ptidxy[1]] = M_2d[ptidxy[0]][ptidxy[1]] + 1
+                self.M_2d[ptidxy[0]][ptidxy[1]] = self.M_2d[ptidxy[0]][ptidxy[1]] + 1
                 pt1xy = f"{ptidxy[0]}.{ptidxy[1]}"
                 if pt1xy not in self.pts1idxy:
                     self.pts1idxy.append(pt1xy)
                     self.binT_2d[ptidxy[0]][ptidxy[1]] = 1
                 self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
+        
+
         TOC("Stack to 2D")
 
     def rayT_2d(self):
@@ -129,14 +141,20 @@ PrMap_ = process_pts("data/bin/TPB_global_map.bin", range_m, resolution)
 
 # debug: make sure the aglignment is corrected
 # Query_.o3d_pts.view_compare(Query_.o3d_pts.pts, PrMap_.o3d_pts.pts)
-
-Query_.all_process(Query_.points[0,:])
-PrMap_.all_process(Query_.points[0,:])
+center_point = np.array(Query_.o3d_pts.pts.points)[0,:]
+print(" o3d center: ", center_point)
+Query_.all_process(center_point)
+PrMap_.all_process(center_point)
 
 Query2d = Query_.rayT_2d()
+Query2d = 1 - Query_.binT_2d
 KL_Matrix = np.zeros((Query_.dim_2d, Query_.dim_2d))
 ## 6. The grid have one calculate the KL Diversity
-Grids_Trigger_KL = list(zip(*np.where(Query2d.dot(PrMap_.binT_2d) == 1)))
+QdP = Query2d * PrMap_.binT_2d
+Grids_Trigger_KL = list(zip(*np.where(QdP == 1)))
+
+
+
 for item in Grids_Trigger_KL:
     Q_pts_id = Query_.twoD2ptindex[item[0]][item[1]]
     M_pts_id = PrMap_.twoD2ptindex[item[0]][item[1]]
@@ -144,16 +162,25 @@ for item in Grids_Trigger_KL:
     M_Prob = calGMM(PrMap_.points[M_pts_id][:,Z_AXIS].reshape(-1,1))
     KL_Matrix[item[0]][item[1]] = gmm_kl(Q_Prob, M_Prob)
 
-if len(Grids_Trigger_KL)!=0:
-    # TODO: view the Matrix with the pts also?
-    ## 7. Difference Show to view the distribution with heatmap
-    import matplotlib.pyplot as plt
-    plt.imshow(KL_Matrix, cmap='hot', interpolation='nearest')
-    plt.show()
 
+# TODO: view the Matrix with the pts also?
+## 7. Difference Show to view the distribution with heatmap
+fig, axs = plt.subplots(2, 2, figsize=(8,8))
+axs[0,0].imshow(Query2d, cmap='hot', interpolation='nearest')
+axs[0,0].set_title('Query pts ray 2d')
+axs[0,1].imshow(PrMap_.binT_2d, cmap='hot', interpolation='nearest')
+axs[0,1].set_title('Prior Map bin 2d')
+axs[1,0].imshow(QdP, cmap='hot', interpolation='nearest')
+axs[1,0].set_title('Q dot P matrix')
+axs[1,1].imshow(KL_Matrix, cmap='hot', interpolation='nearest')
+axs[1,1].set_title('KL Matrix after normalization')
+plt.show()
+
+if len(Grids_Trigger_KL)!=0:
     ## 8. remove the xy bins output the Global Map
     # How to set the threshold??
-    Grids_Trigger_KL2pt = list(zip(*np.where(KL_Matrix > 5)))
+    Grids_Trigger_KL2pt = list(zip(*np.where(KL_Matrix > 0)))
+    # Grids_Trigger_KL2pt = list(zip(*np.where(PrMap_.M_2d > 0)))
     points_index2Remove = []
     for item in Grids_Trigger_KL2pt:
         Remove_ptid = PrMap_.twoD2ptindex[item[0]][item[1]]
@@ -161,6 +188,17 @@ if len(Grids_Trigger_KL)!=0:
 
     inlier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove)
     oulier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove, invert=True)
-    PrMap_.o3d_pts.view_compare(inlier_cloud, oulier_cloud)
+    PrMap_.o3d_pts.view_compare(inlier_cloud, oulier_cloud, Query_.o3d_pts.rmg_pts)
+# else:
+
+# Grids_Trigger_KL2pt = list(zip(*np.where(Query2d > 0)))
+# points_index2Remove = []
+# for item in Grids_Trigger_KL2pt:
+#     Remove_ptid = PrMap_.twoD2ptindex[item[0]][item[1]]
+#     points_index2Remove = points_index2Remove + Remove_ptid
+
+# inlier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove)
+# oulier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove, invert=True)
+# PrMap_.o3d_pts.view_compare(inlier_cloud, oulier_cloud, Query_.o3d_pts.rmg_pts)
 
 print("All success")
