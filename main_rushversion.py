@@ -12,9 +12,8 @@ from collections import defaultdict
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import normalize
 
-from utils import load_view_point, save_view_point, bresenham, quat2mat
+from utils import load_view_point, save_view_point, quat2mat, RayOutside
 from utils.global_def import *
-from scipy.special import rel_entr
 import matplotlib.pyplot as plt
 
 resolution = 0.5 # default 16-LiDAR, 1 meter
@@ -43,7 +42,7 @@ class o3d_point:
         inlier_cloud = self.pts.select_by_index(inliers)
         self.rmg_pts = self.pts.select_by_index(inliers, invert=True)
         # save_view_point([inlier_cloud.paint_uniform_color([1.0, 0, 0]), self.rmg_pts], "data/TPB.json")
-        load_view_point([inlier_cloud.paint_uniform_color([1.0, 0, 0]), self.rmg_pts], "data/TPB.json")
+        # load_view_point([inlier_cloud.paint_uniform_color([1.0, 0, 0]), self.rmg_pts], "data/TPB.json")
         
         TOC("REMOVE GROUND")
     def view_compare(self, inlier, outlier, others=None):
@@ -95,18 +94,17 @@ class process_pts:
                     self.binT_2d[ptidxy[0]][ptidxy[1]] = 1
                 self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
         
-
         TOC("Stack to 2D")
 
     def rayT_2d(self):
         ## 4. Ray Tracking in M_2d
-        self.RayT_2d = np.zeros((self.dim_2d, self.dim_2d))
+        self.RayT_2d = np.ones((self.dim_2d, self.dim_2d))
         for eid in self.pts1idxy:
             x1 = int(eid.split('.')[0])
             y1 = int(eid.split('.')[1])
-            grid2one =bresenham(self.dim_2d//2,self.dim_2d//2, x1,y1)
+            grid2one =RayOutside(self.dim_2d//2,self.dim_2d//2, x1,y1)
             for sidxy in grid2one:
-                self.RayT_2d[sidxy[0]][sidxy[1]] = 1
+                self.RayT_2d[sidxy[0]][sidxy[1]] = 0
         TOC("Ray Casting")
         return self.RayT_2d
 
@@ -147,7 +145,7 @@ Query_.all_process(center_point)
 PrMap_.all_process(center_point)
 
 Query2d = Query_.rayT_2d()
-Query2d = 1 - Query_.binT_2d
+# Query2d = 1 - Query_.binT_2d
 KL_Matrix = np.zeros((Query_.dim_2d, Query_.dim_2d))
 ## 6. The grid have one calculate the KL Diversity
 QdP = Query2d * PrMap_.binT_2d
@@ -170,9 +168,9 @@ axs[0,0].imshow(Query2d, cmap='hot', interpolation='nearest')
 axs[0,0].set_title('Query pts ray 2d')
 axs[0,1].imshow(PrMap_.binT_2d, cmap='hot', interpolation='nearest')
 axs[0,1].set_title('Prior Map bin 2d')
-axs[1,0].imshow(QdP, cmap='hot', interpolation='nearest')
-axs[1,0].set_title('Q dot P matrix')
-axs[1,1].imshow(KL_Matrix, cmap='hot', interpolation='nearest')
+axs[1,0].imshow(Query_.binT_2d, cmap='hot', interpolation='nearest')
+axs[1,0].set_title('Query Map bin 2d')
+axs[1,1].imshow(np.clip(KL_Matrix, 0, 10), cmap='hot', interpolation='nearest')
 axs[1,1].set_title('KL Matrix after normalization')
 plt.show()
 
