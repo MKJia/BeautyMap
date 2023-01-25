@@ -35,6 +35,7 @@ run debug data (Three people behind the car):
 python main_rushversion.py
 ```
 
+ATTENTION: 如果有什么弹出的窗口，是因为现在还在调试阶段，请切换英文输入后，按下键盘：q 即可退出 继续运行后续!!
 
 
 ## Others
@@ -45,3 +46,6 @@ print(f"{points.shape}")
 # [1394189,4](lecai) [25380, 4](16-velodyne) 
 # 4: (x, y, z, intensity)
 ```
+
+Issues:
+1. [https://stackoverflow.com/questions/52727700/sklearn-kmeans-convergence-warning](https://stackoverflow.com/questions/52727700/sklearn-kmeans-convergence-warning)
