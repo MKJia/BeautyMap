@@ -15,15 +15,25 @@ sys.path.append(BASE_DIR)
 
 from utils.global_def import *
 from utils.o3d_view import ViewControl
+
+DATA_FROM = 1 # 0: KITTI, 1: CARLA
 # ========> CONFIG HERE
-DataFolder = f"{BASE_DIR}/data/test/teaser" # make sure the subfolder is labels and points
+DataFolder = f"{BASE_DIR}/data/test/kitti_teaser" # make sure the subfolder is labels and points
 # each points need have `.label` file to match
 MaxFramePlay = 100 # if you want to play all of them, set -1
 
 CFG = yaml.safe_load(open(f"{BASE_DIR}/test/semantic_label/semantic-label.yaml", 'r'))
+
+if DATA_FROM == 1:
+    DataFolder = f"{BASE_DIR}/data/test/carla_teaser" # make sure the subfolder is labels and points
+    # each points need have `.label` file to match
+    MaxFramePlay = 100 # if you want to play all of them, set -1
+
+    CFG = yaml.safe_load(open(f"{BASE_DIR}/test/semantic_label/semantic-carla.yaml", 'r'))
+
 # <======== CONFIG HERE
 
-pts_folder = f"{DataFolder}/points"
+pts_folder = f"{DataFolder}/lidar"
 label_folder = f"{DataFolder}/labels"
 pts_files = sorted(os.listdir(pts_folder))
 

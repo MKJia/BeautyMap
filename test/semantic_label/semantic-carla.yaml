@@ -1,0 +1,169 @@
+# This config file from Semantic Kitti
+# Check origin from: https://github.com/PRBonn/semantic-kitti-api
+labels: 
+  0 : "unlabeled" # None
+  3 : "outlier"
+  18 : "static"     # for lidar-mos static 
+  10: "car"
+  # 11: "bicycle"
+  # 13: "bus"
+  # 15: "motorcycle"
+  17: "on-rails"
+  16: "truck"
+  # 20: "other-vehicle"
+  4: "person"
+  # 4: "bicyclist"
+  # 32: "motorcyclist"
+  7: "road"
+  # 44: "parking"
+  8: "sidewalk"
+  14: "other-ground"
+  1: "building"
+  2: "fence"
+  11: "other-structure" # Wall
+  6: "lane-marking"
+  9: "vegetation"
+  # 71: "trunk"
+  21: "terrain"
+  5: "pole"
+  12: "traffic-sign" 
+  17: "TrafficLight" # should be same with traffic-sign
+  13: "other-object" # sky
+  19: "moving"      # lidar-mos mod moving
+  20: "moving-car" # # Water
+  28: "fence" # iron fence
+color_map: # bgr
+  0 : [255, 255, 255] # None
+  1 : [70, 70, 70]    # Building
+  2 : [100, 40, 40]   # Fences
+  3 : [55, 90, 80]    # Other
+  4 : [220, 20, 60]   # Pedestrian
+  5 : [153, 153, 153] # Pole
+  6 : [157, 234, 50]  # RoadLines
+  7 : [128, 64, 128]  # Road
+  8 : [244, 35, 232]  # Sidewalk
+  9 : [107, 142, 35]  # Vegetation
+  10: [0, 0, 142]     # Vehicle
+  11: [102, 102, 156] # Wall
+  12: [220, 220, 0]   # TrafficSign
+  13: [70, 130, 180]  # Sky
+  14: [81, 0, 81]     # Ground
+  15: [150, 100, 100] # Bridge
+  16: [230, 150, 140] # RailTrack
+  17: [180, 165, 180] # GuardRail
+  18: [250, 170, 30]  # TrafficLight
+  19: [110, 190, 160] # Static
+  20: [170, 120, 50]  # Dynamic
+  21: [45, 60, 150]   # Water
+  22: [145, 170, 100] # Terrain
+  28: [100, 40, 40]  # iron fence
+content: # as a ratio with the total number of points
+  0: 0.018889854628292943
+  1: 0.0002937197336781505
+  10: 0.040818519255974316
+  11: 0.00016609538710764618
+  13: 2.7879693665067774e-05
+  15: 0.00039838616015114444
+  16: 0.0
+  18: 0.0020633612104619787
+  20: 0.0016218197275284021
+  30: 0.00017698551338515307
+  31: 1.1065903904919655e-08
+  32: 5.532951952459828e-09
+  40: 0.1987493871255525
+  44: 0.014717169549888214
+  48: 0.14392298360372
+  49: 0.0039048553037472045
+  50: 0.1326861944777486
+  51: 0.0723592229456223
+  52: 0.002395131480328884
+  60: 4.7084144280367186e-05
+  70: 0.26681502148037506
+  71: 0.006035012012626033
+  72: 0.07814222006271769
+  80: 0.002855498193863172
+  81: 0.0006155958086189918
+  99: 0.009923127583046915
+  252: 0.001789309418528068
+  253: 0.00012709999297008662
+  254: 0.00016059776092534436
+  255: 3.745553104802113e-05
+  256: 0.0
+  257: 0.00011351574470342043
+  258: 0.00010157861367183268
+  259: 4.3840131989471124e-05
+# classes that are indistinguishable from single scan or inconsistent in
+# ground truth are mapped to their closest equivalent
+learning_map:
+  0 : 0     # "unlabeled"       mapped to "unlabeled" ------------------------mapped
+  1 : 0     # "outlier"         mapped to "unlabeled" ------------------------mapped
+  9 : 1     # "static"          mapped to "static" ---------------------------mapped
+  10: 1     # "car"             mapped to "static" ---------------------------mapped
+  11: 1     # "bicycle"         mapped to "static" ---------------------------mapped
+  13: 1     # "bus"             mapped to "static" ---------------------------mapped
+  15: 1     # "motorcycle"      mapped to "static" ---------------------------mapped
+  16: 1     # "on-rails"        mapped to "static" ---------------------------mapped
+  18: 1     # "truck"           mapped to "static" ---------------------------mapped
+  20: 1     # "other-vehicle"   mapped to "static" ---------------------------mapped
+  30: 1     # "person"          mapped to "static" ---------------------------mapped
+  31: 1     # "bicyclist"       mapped to "static" ---------------------------mapped
+  32: 1     # "motorcyclist"    mapped to "static" ---------------------------mapped
+  40: 1     # "road"            mapped to "static" ---------------------------mapped
+  44: 1    # "parking"          mapped to "static" ---------------------------mapped
+  48: 1    # "sidewalk"         mapped to "static" ---------------------------mapped
+  49: 1    # "other-ground"     mapped to "static" ---------------------------mapped
+  50: 1    # "building"         mapped to "static" ---------------------------mapped
+  51: 1    # "fence"            mapped to "static" ---------------------------mapped
+  52: 1     # "other-structure" mapped to "static" ---------------------------mapped
+  60: 1     # "lane-marking"    mapped to "static" ---------------------------mapped
+  70: 1    # "vegetation"       mapped to "static" ---------------------------mapped
+  71: 1    # "trunk"            mapped to "static" ---------------------------mapped
+  72: 1    # "terrain"          mapped to "static" ---------------------------mapped
+  80: 1    # "pole"             mapped to "static" ---------------------------mapped
+  81: 1    # "traffic-sign"     mapped to "static" ---------------------------mapped
+  99: 1     # "other-object"    mapped to "static" ---------------------------mapped
+  251: 2    # "moving"              mapped to "moving" ---------------------------mapped
+  252: 2    # "moving-car"          mapped to "moving" ---------------------------mapped
+  253: 2    # "moving-bicyclist"    mapped to "moving" ---------------------------mapped
+  254: 2    # "moving-person"       mapped to "moving" ---------------------------mapped
+  255: 2    # "moving-motorcyclist" mapped to "moving" ---------------------------mapped
+  256: 2    # "moving-on-rails"     mapped to "moving" ---------------------------mapped
+  257: 2    # "moving-bus"          mapped to "moving" ---------------------------mapped
+  258: 2    # "moving-truck"        mapped to "moving" ---------------------------mapped
+  259: 2    # "moving-other"        mapped to "moving" ---------------------------mapped
+learning_map_inv: # inverse of previous map
+  0: 0      # "unlabeled", and others ignored
+  1: 9      # "static"
+  2: 251    # "moving"
+
+learning_ignore: # Ignore classes
+  0: True      # "unlabeled", and others ignored
+  1: False     # "static"
+  2: False     # "moving"
+  
+split: # sequence numbers
+  train:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+  valid:
+    - 8
+  test:
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21

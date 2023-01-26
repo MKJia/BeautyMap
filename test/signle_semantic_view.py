@@ -18,7 +18,7 @@ from utils.global_def import *
 from utils.o3d_view import ViewControl
 points = np.fromfile(f"{BASE_DIR}/data/test/000000.bin", dtype=np.float32).reshape(-1, 4)[:,:3]
 labels = np.fromfile(f"{BASE_DIR}/data/test/000000.label", dtype=np.uint32) & 0xFFFF # since we only care about semantic (lower 16 for semantic, higher 16 for instance)
-CFG = yaml.safe_load(open(f"{BASE_DIR}/test/semantic_label/semantic-label.yaml", 'r'))
+CFG = yaml.safe_load(open(f"{BASE_DIR}/test/semantic_label/semantic-carla.yaml", 'r'))
 
 pc = o3d.geometry.PointCloud()
 colors = []

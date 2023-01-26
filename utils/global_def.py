@@ -35,6 +35,13 @@ def TIC():
     # Records a time in TicToc, marks the beginning of a time interval
     TOC(tempBool=False)
 
+import os
+def mkdir_folder(path, sensor_type):
+    for s_type in sensor_type:
+        if not os.path.isdir(os.path.join(path, s_type)):
+            os.makedirs(os.path.join(path, s_type))
+    return True
+
 class bc:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'

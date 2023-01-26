@@ -18,7 +18,8 @@ from utils import load_view_point, save_view_point
 from utils.global_def import *
 
 
-new_pts = np.fromfile(f"{BASE_DIR}/data/bin/TPB_global_map.bin", dtype=np.float32).reshape(-1, 4)
+new_pts = np.fromfile(f"{BASE_DIR}/data/bin/104951.bin", dtype=np.float32).reshape(-1, 4)
+print(f"points shape: {new_pts.shape}")
 pts = o3d.geometry.PointCloud()
 pts.points = o3d.utility.Vector3dVector(new_pts[:,:3])
 # pts.colors = o3d.utility.Vector3dVector(np.random.uniform(0, 1, size=(new_pts.shape[0], 3)))

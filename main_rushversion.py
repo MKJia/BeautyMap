@@ -106,7 +106,8 @@ class process_pts:
                 if pt1xy not in self.pts1idxy:
                     self.pts1idxy.append(pt1xy)
                     self.binT_2d[ptidxy[0]][ptidxy[1]] = 1
-                self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
+                if self.rmg_pts[i][2]<1.5: # TODO hard threshold
+                    self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
         
         TOC("Stack to 2D")
 
