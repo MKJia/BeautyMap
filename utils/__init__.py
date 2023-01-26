@@ -6,7 +6,7 @@
 
 import numpy as np
 import open3d as o3d
-
+from .o3d_view import ViewControl
 
 def save_view_point(viewThings: list, filename):
     vis = o3d.visualization.Visualizer()
@@ -14,8 +14,8 @@ def save_view_point(viewThings: list, filename):
     for sth in viewThings:
         vis.add_geometry(sth)
     vis.run()  # user changes the view and press "q" to terminate
-    param = vis.get_view_control().convert_to_pinhole_camera_parameters()
-    o3d.io.write_pinhole_camera_parameters(filename, param)
+    # param = vis.get_view_control().convert_to_pinhole_camera_parameters()
+    # o3d.io.write_pinhole_camera_parameters(filename, param)
     vis.destroy_window()
 
 
@@ -23,10 +23,9 @@ def load_view_point(viewThings: list, filename):
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     ctr = vis.get_view_control()
-    param = o3d.io.read_pinhole_camera_parameters(filename)
     for sth in viewThings:
         vis.add_geometry(sth)
-    ctr.convert_from_pinhole_camera_parameters(param)
+    o3d_vctrl = ViewControl(ctr, filename)
     vis.run()
     vis.destroy_window()
 

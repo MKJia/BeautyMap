@@ -88,7 +88,7 @@ class process_pts:
         self.resolution = resolution
         self.dim_2d = (int)(range_m/resolution)
         self.twoD2ptindex = defaultdict(lambda  : defaultdict(list))
-        self.binT_2d = np.zeros((self.dim_2d, self.dim_2d))
+        self.binT_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
         TOC("Initial steps")
 
     def all_process(self, center):

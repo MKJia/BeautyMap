@@ -1,5 +1,7 @@
-open3d==0.16.0
+open3d
 scikit-learn
 scipy
 pandas
 matplotlib
+yaml
+json
