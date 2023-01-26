@@ -7,18 +7,32 @@
 
 import open3d as o3d
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 from collections import defaultdict
 from sklearn.mixture import GaussianMixture
-from sklearn.preprocessing import normalize
 
 from utils import load_view_point, save_view_point, quat2mat, RayOutside
 from utils.global_def import *
-import matplotlib.pyplot as plt
 
 resolution = 0.5 # default 16-LiDAR, 1 meter
 range_m = 10 # default 16-LiDAR, 20 meter
 RANDOM_SEED = 10
+NUM_GAUSSIAN = 1 # mixture gaussian number
+# if your lidar is not vertical place respect to ground, please times the rotation first..
+'''
+correct relationship should be like this:
+ z
+ |__ y
+/
+x
+
+ ground plane:
+ __ y
+/
+x
+'''
 X_AXIS = 0 # ground plane x
 Y_AXIS = 1 # ground plane y
 Z_AXIS = 2
@@ -52,7 +66,7 @@ class o3d_point:
             view_things.append(others)
         inlier.paint_uniform_color([1.0, 0, 0])
         view_things.append(inlier)
-        load_view_point(view_things, "data/TPB.json")
+        load_view_point(view_things, "data/o3d_view/TPB.json")
     def view(self,pts):
         o3d.visualization.draw_geometries([pts])
         
@@ -111,10 +125,10 @@ class process_pts:
 def calGMM(data):
     
     if len(data)<=1:
-        gm= GaussianMixture(n_components=2, random_state=RANDOM_SEED).fit((-1*np.ones((100,1))).reshape(-1,1))
+        gm= GaussianMixture(n_components=NUM_GAUSSIAN, random_state=RANDOM_SEED).fit((-1*np.ones((100,1))).reshape(-1,1))
     else:
         # data = np.repeat(data, 2).reshape(-1,1)
-        gm = GaussianMixture(n_components=2, random_state=RANDOM_SEED).fit(data)
+        gm = GaussianMixture(n_components=NUM_GAUSSIAN, random_state=RANDOM_SEED).fit(data)
     return gm
 
 # reference: https://stackoverflow.com/questions/26079881/kl-divergence-of-two-gmms?noredirect=1&lq=1
@@ -126,7 +140,6 @@ def gmm_kl(gmm_p, gmm_q, n_samples=10**3):
     return log_p_X.mean() - log_q_X.mean()
 
 ## 5. Times Map and Query Matrix
-import pandas as pd
 df = pd.read_csv('data/TPB_poses_lidar2body.csv')
 pose = df.values[100][2:]
 wxyz = np.array([pose[6],pose[3],pose[4],pose[5]])
@@ -145,13 +158,11 @@ Query_.all_process(center_point)
 PrMap_.all_process(center_point)
 
 Query2d = Query_.rayT_2d()
-# Query2d = 1 - Query_.binT_2d
+# Query2d = 1 - Query_.binT_2d # for bin methods
 KL_Matrix = np.zeros((Query_.dim_2d, Query_.dim_2d))
 ## 6. The grid have one calculate the KL Diversity
 QdP = Query2d * PrMap_.binT_2d
 Grids_Trigger_KL = list(zip(*np.where(QdP == 1)))
-
-
 
 for item in Grids_Trigger_KL:
     Q_pts_id = Query_.twoD2ptindex[item[0]][item[1]]
@@ -181,22 +192,12 @@ if len(Grids_Trigger_KL)!=0:
     # Grids_Trigger_KL2pt = list(zip(*np.where(PrMap_.M_2d > 0)))
     points_index2Remove = []
     for item in Grids_Trigger_KL2pt:
+        # TODO if possible, do prediction here also for low probability point remove
         Remove_ptid = PrMap_.twoD2ptindex[item[0]][item[1]]
         points_index2Remove = points_index2Remove + Remove_ptid
 
     inlier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove)
     oulier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove, invert=True)
     PrMap_.o3d_pts.view_compare(inlier_cloud, oulier_cloud, Query_.o3d_pts.rmg_pts)
-# else:
 
-# Grids_Trigger_KL2pt = list(zip(*np.where(Query2d > 0)))
-# points_index2Remove = []
-# for item in Grids_Trigger_KL2pt:
-#     Remove_ptid = PrMap_.twoD2ptindex[item[0]][item[1]]
-#     points_index2Remove = points_index2Remove + Remove_ptid
-
-# inlier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove)
-# oulier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove, invert=True)
-# PrMap_.o3d_pts.view_compare(inlier_cloud, oulier_cloud, Query_.o3d_pts.rmg_pts)
-
-print("All success")
+print("All codes run successfully, Close now..")

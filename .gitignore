@@ -1,5 +1,6 @@
 *.pcd
 *.bin
+*.label
 *.csv
 
 .vscode/*

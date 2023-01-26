@@ -66,7 +66,11 @@ def RayOutside(x0, y0, x1, y1):
     deltaX = x1-x0
 
     if deltaX==0 or deltaY==0:
-        print("line")
+        # maybe bug here, since y1-0 or x1-0 didn't include
+        delta = dim-y1 if deltaX==0 else dim-x1
+        factor = 1 if deltaX==0 else 0
+        for i in range(delta):
+            rayLists.append([x1+factor*i, y1+factor*i])
     else:
         xi = x1
         yi = y1
