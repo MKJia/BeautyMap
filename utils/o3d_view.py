@@ -22,7 +22,9 @@ Then press 'V' on keyboard, will set from json
 import open3d as o3d
 import os, sys
 import json
-
+import numpy as np
+BASE_DIR = os.path.abspath(os.path.join( os.path.dirname( __file__ ), '..' ))
+sys.path.append(BASE_DIR)
 class ViewControl:
     def __init__(self, vctrl: o3d.visualization.ViewControl, view_file=None):
         self.vctrl = vctrl
@@ -54,12 +56,13 @@ class ViewControl:
 
 
 if __name__ == "__main__":
+    view_json_file = f"{BASE_DIR}/data/o3d_view/default_test.json"
     sample_ply_data = o3d.data.PLYPointCloud()
     pcd = o3d.io.read_point_cloud(sample_ply_data.path)
     # 1. define
     viz = o3d.visualization.VisualizerWithKeyCallback()
     # 2. create
-    viz.create_window()
+    viz.create_window(window_name="TEST ON Change View point through JSON, Press V Please")
     # 3. add geometry
     viz.add_geometry(pcd)
     # 4. get control !!! must step by step
@@ -69,7 +72,7 @@ if __name__ == "__main__":
 
     def set_view(viz):
         #Your update routine
-        o3d_vctrl.read_viewTfile('/home/kin/workspace/EDOMap/data/o3d_view/default_test.json')
+        o3d_vctrl.read_viewTfile(view_json_file)
         viz.update_renderer()
         viz.poll_events()
         viz.run()
