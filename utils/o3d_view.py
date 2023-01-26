@@ -9,8 +9,9 @@
 This file is for open3d view control set from view_file, which should be json
 1. use normal way to open any gemotry and set view by mouse you want
 2. `CTRL+C` it will copy the view detail at this moment.
-3. `CTRL+V` to json file
+3. `CTRL+V` to json file, you can create new one
 4. give the json file path
+Check this part: http://www.open3d.org/docs/release/tutorial/visualization/visualization.html#Store-view-point
 
 Test if you want by run this script
 
