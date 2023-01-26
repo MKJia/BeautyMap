@@ -51,7 +51,7 @@ class o3d_point:
         # [a, b, c, d] = plane_model
         # print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
 
-        inliers = np.transpose((np.asarray(self.pts.points)[:,2]<=0).nonzero())
+        inliers = np.transpose((np.asarray(self.pts.points)[:,2]<=0.3).nonzero())
         
         inlier_cloud = self.pts.select_by_index(inliers)
         self.rmg_pts = self.pts.select_by_index(inliers, invert=True)
@@ -77,7 +77,7 @@ class process_pts:
         TIC()
         self.points = np.fromfile(file, dtype=np.float32).reshape(-1, 4)
         # point the center points
-        np.insert(self.points, 0, np.array([0,0,0,-1]),axis=0)
+        self.points = np.insert(self.points, 0, np.array([0,0,0,-1]),axis=0)
         TOC("Numpy read pt")
 
         self.o3d_pts = o3d_point(self.points)
@@ -86,7 +86,7 @@ class process_pts:
         self.rmg_pts = np.asarray(self.o3d_pts.rmg_pts.points)
         self.range_m = range_m
         self.resolution = resolution
-        self.dim_2d = (int)(range_m/resolution) + 1
+        self.dim_2d = (int)(range_m/resolution)
         self.twoD2ptindex = defaultdict(lambda  : defaultdict(list))
         self.binT_2d = np.zeros((self.dim_2d, self.dim_2d))
         TOC("Initial steps")
@@ -100,7 +100,7 @@ class process_pts:
         
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
-            if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>0 and ptidxy[0]>0:
+            if ptidxy[0] <= self.dim_2d and ptidxy[1]<=self.dim_2d and ptidxy[1]>0 and ptidxy[0]>0:
                 self.M_2d[ptidxy[0]][ptidxy[1]] = self.M_2d[ptidxy[0]][ptidxy[1]] + 1
                 pt1xy = f"{ptidxy[0]}.{ptidxy[1]}"
                 if pt1xy not in self.pts1idxy:
@@ -118,6 +118,9 @@ class process_pts:
             y1 = int(eid.split('.')[1])
             grid2one =RayOutside(self.dim_2d//2,self.dim_2d//2, x1,y1)
             for sidxy in grid2one:
+                if sidxy[0]>=self.dim_2d or sidxy[1]>=self.dim_2d:
+                    print("exceed the max dim")
+                    continue
                 self.RayT_2d[sidxy[0]][sidxy[1]] = 0
         TOC("Ray Casting")
         return self.RayT_2d
@@ -179,8 +182,8 @@ axs[0,0].imshow(Query2d, cmap='hot', interpolation='nearest')
 axs[0,0].set_title('Query pts ray 2d')
 axs[0,1].imshow(PrMap_.binT_2d, cmap='hot', interpolation='nearest')
 axs[0,1].set_title('Prior Map bin 2d')
-axs[1,0].imshow(Query_.binT_2d, cmap='hot', interpolation='nearest')
-axs[1,0].set_title('Query Map bin 2d')
+axs[1,0].imshow(QdP, cmap='hot', interpolation='nearest')
+axs[1,0].set_title('Query ray times Prori Map')
 axs[1,1].imshow(np.clip(KL_Matrix, 0, 10), cmap='hot', interpolation='nearest')
 axs[1,1].set_title('KL Matrix after normalization')
 plt.show()
