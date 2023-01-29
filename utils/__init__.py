@@ -65,11 +65,13 @@ def RayOutside(x0, y0, x1, y1):
     deltaX = x1-x0
 
     if deltaX==0 or deltaY==0:
-        # maybe bug here, since y1-0 or x1-0 didn't include
-        delta = dim-y1 if deltaX==0 else dim-x1
         factor = 1 if deltaX==0 else 0
-        for i in range(delta):
-            rayLists.append([x1+factor*i, y1+factor*i])
+        if deltaX==0:
+            delta = range(dim - y1) if y1>y0 else range(-y1,0)
+        else:
+            delta = range(dim - x1) if x1>x0 else range(-x1,0)
+        for i in delta:
+            rayLists.append([x1+(1-factor)*i, y1+factor*i])
     else:
         xi = x1
         yi = y1
@@ -78,13 +80,13 @@ def RayOutside(x0, y0, x1, y1):
         if slope>0:
             minusO = -1 if deltaX<0 else 1 # 第三象限  x y 都需要相减
             if slope>1: # y 增长速度更快
-                while 0<yi<dim:
+                while 0<=yi<dim:
                     rayLists.append([int(xi),int(yi)])
                     yi = yi + 1*minusO
                     xi = x0 + (yi-y0)/slope
                     # yi = slope*(xi-x0) + y0
             else:
-                while 0<xi<dim:
+                while 0<=xi<dim:
                     rayLists.append([int(xi),int(yi)])
                     xi = xi + 1*minusO
                     yi = slope*(xi-x0) + y0
@@ -93,12 +95,12 @@ def RayOutside(x0, y0, x1, y1):
             minusY = 1 if deltaX<0 else -1 # y+1
             minusX = 1 if deltaY<0 else -1 # x-1
             if abs(slope)>1: # y 增长速度更快
-                while 0<yi<dim:
+                while 0<=yi<dim:
                     rayLists.append([int(xi),int(yi)])
                     yi = yi + 1*minusY
                     xi = x0 + (yi-y0)/slope
             else:
-                while 0<xi<dim:
+                while 0<=xi<dim:
                     rayLists.append([int(xi),int(yi)])
                     xi = xi + 1*minusX
                     yi = slope*(xi-x0) + y0
