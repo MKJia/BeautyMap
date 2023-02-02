@@ -57,6 +57,51 @@ def quat2mat(quat):
     mat[..., 2, 1] = yZ + wX
     mat[..., 2, 2] = 1.0 - (xX + yY)
     return np.where((Nq > _FLOAT_EPS)[..., np.newaxis, np.newaxis], mat, np.eye(3))
+def RayInside(x0, y0, x1, y1):
+    dim = int(x0*2)
+    rayLists = []
+    deltaY = y1-y0
+    deltaX = x1-x0
+
+    if deltaX==0 or deltaY==0:
+        factor = 1 if deltaX==0 else 0
+        if deltaY==0:
+            delta = range(deltaX) if deltaX>0 else range(deltaX, 0)
+        else:
+            delta = range(deltaY) if deltaY>0 else range(deltaY, 0)
+        for i in delta:
+            rayLists.append([x0+(1-factor)*i, y0+factor*i])
+    else:
+        xi = x0
+        yi = y0
+        slope = deltaY/deltaX
+        deltaY = range(deltaY) if deltaY>0 else range(deltaY, 0)
+        deltaX = range(deltaX) if deltaX>0 else range(deltaX, 0)
+        # 第一 三象限
+        if slope>0:
+            if slope>1: # y 增长速度更快
+                for i in deltaY:
+                    rayLists.append([int(xi),int(yi)])
+                    yi = y0 + i
+                    xi = x0 + (yi-y0)/slope
+            else:
+                for i in deltaX:
+                    rayLists.append([int(xi),int(yi)])
+                    xi = x0 + i
+                    yi = slope*(xi-x0) + y0
+        # 第二 四象限
+        else:
+            if abs(slope)>1: # y 增长速度更快
+                for i in deltaY:
+                    rayLists.append([int(xi),int(yi)])
+                    yi = y0 + i
+                    xi = x0 + (yi-y0)/slope
+            else:
+                for i in deltaX:
+                    rayLists.append([int(xi),int(yi)])
+                    xi = x0 + i
+                    yi = slope*(xi-x0) + y0
+    return rayLists
 
 def RayOutside(x0, y0, x1, y1):
     dim = int(x0*2)
