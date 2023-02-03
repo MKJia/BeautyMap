@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 from sklearn.mixture import GaussianMixture
 
-from utils import load_view_point, save_view_point, quat2mat, RayOutside
+from utils import load_view_point, save_view_point, quat2mat, RayOutside, RayInside
 from utils.global_def import *
 
 resolution = 0.5 # default 16-LiDAR, 1 meter
@@ -52,9 +52,12 @@ class o3d_point:
         # print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
 
         inliers = np.transpose((np.asarray(self.pts.points)[:,2]<=0.3).nonzero())
-        
         inlier_cloud = self.pts.select_by_index(inliers)
         self.rmg_pts = self.pts.select_by_index(inliers, invert=True)
+
+        # No REMOVE GROUND
+        # self.rmg_pts = self.pts
+
         # save_view_point([inlier_cloud.paint_uniform_color([1.0, 0, 0]), self.rmg_pts], "data/TPB.json")
         # load_view_point([inlier_cloud.paint_uniform_color([1.0, 0, 0]), self.rmg_pts], "data/TPB.json")
         
@@ -100,7 +103,7 @@ class process_pts:
         
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
-            if ptidxy[0] <= self.dim_2d and ptidxy[1]<=self.dim_2d and ptidxy[1]>0 and ptidxy[0]>0:
+            if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>=0 and ptidxy[0]>=0:
                 self.M_2d[ptidxy[0]][ptidxy[1]] = self.M_2d[ptidxy[0]][ptidxy[1]] + 1
                 pt1xy = f"{ptidxy[0]}.{ptidxy[1]}"
                 if pt1xy not in self.pts1idxy:
@@ -113,16 +116,19 @@ class process_pts:
 
     def rayT_2d(self):
         ## 4. Ray Tracking in M_2d
-        self.RayT_2d = np.ones((self.dim_2d, self.dim_2d))
+        self.RayT_2d = np.zeros((self.dim_2d, self.dim_2d))
         for eid in self.pts1idxy:
             x1 = int(eid.split('.')[0])
             y1 = int(eid.split('.')[1])
-            grid2one =RayOutside(self.dim_2d//2,self.dim_2d//2, x1,y1)
+            grid2one =RayInside(self.dim_2d//2,self.dim_2d//2, x1,y1)
             for sidxy in grid2one:
                 if sidxy[0]>=self.dim_2d or sidxy[1]>=self.dim_2d:
                     print("exceed the max dim")
                     continue
-                self.RayT_2d[sidxy[0]][sidxy[1]] = 0
+                elif f"{sidxy[0]}.{sidxy[1]}" in self.pts1idxy:
+                    print("inside the sidxy")
+                    continue
+                self.RayT_2d[sidxy[0]][sidxy[1]] = 1
         TOC("Ray Casting")
         return self.RayT_2d
 

@@ -66,17 +66,17 @@ def RayInside(x0, y0, x1, y1):
     if deltaX==0 or deltaY==0:
         factor = 1 if deltaX==0 else 0
         if deltaY==0:
-            delta = range(deltaX) if deltaX>0 else range(deltaX, 0)
+            delta = range(deltaX-1) if deltaX>0 else range(deltaX+1, 0)
         else:
-            delta = range(deltaY) if deltaY>0 else range(deltaY, 0)
+            delta = range(deltaY-1) if deltaY>0 else range(deltaY+1, 0)
         for i in delta:
             rayLists.append([x0+(1-factor)*i, y0+factor*i])
     else:
         xi = x0
         yi = y0
         slope = deltaY/deltaX
-        deltaY = range(deltaY) if deltaY>0 else range(deltaY, 0)
-        deltaX = range(deltaX) if deltaX>0 else range(deltaX, 0)
+        deltaY = range(deltaY-1) if deltaY>0 else range(deltaY+1, 0)
+        deltaX = range(deltaX-1) if deltaX>0 else range(deltaX+1, 0)
         # 第一 三象限
         if slope>0:
             if slope>1: # y 增长速度更快
