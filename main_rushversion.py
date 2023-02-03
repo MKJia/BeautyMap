@@ -51,8 +51,8 @@ class o3d_point:
         # [a, b, c, d] = plane_model
         # print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
 
-        inliers = np.transpose((np.asarray(self.pts.points)[:,2]<=0.3).nonzero())
-        inlier_cloud = self.pts.select_by_index(inliers)
+        inliers = np.transpose((np.asarray(self.pts.points)[:,2]<=0).nonzero())
+        self.ground_pts = self.pts.select_by_index(inliers)
         self.rmg_pts = self.pts.select_by_index(inliers, invert=True)
 
         # No REMOVE GROUND
@@ -123,10 +123,8 @@ class process_pts:
             grid2one =RayInside(self.dim_2d//2,self.dim_2d//2, x1,y1)
             for sidxy in grid2one:
                 if sidxy[0]>=self.dim_2d or sidxy[1]>=self.dim_2d:
-                    print("exceed the max dim")
                     continue
                 elif f"{sidxy[0]}.{sidxy[1]}" in self.pts1idxy:
-                    print("inside the sidxy")
                     continue
                 self.RayT_2d[sidxy[0]][sidxy[1]] = 1
         TOC("Ray Casting")
@@ -151,63 +149,67 @@ def gmm_kl(gmm_p, gmm_q, n_samples=10**3):
 
 ## 5. Times Map and Query Matrix
 df = pd.read_csv('data/TPB_poses_lidar2body.csv')
-pose = df.values[100][2:]
-wxyz = np.array([pose[6],pose[3],pose[4],pose[5]])
-T_Q = np.eye(4)
-T_Q[:3,:3] = quat2mat(wxyz)
-T_Q[:3,-1]= np.array([pose[0],pose[1],pose[2]])
-
-Query_ = process_pts("data/bin/TPB_000100.bin", range_m, resolution, T_MATRIX=T_Q)
 PrMap_ = process_pts("data/bin/TPB_global_map.bin", range_m, resolution)
 
-# debug: make sure the aglignment is corrected
-# Query_.o3d_pts.view_compare(Query_.o3d_pts.pts, PrMap_.o3d_pts.pts)
-center_point = np.array(Query_.o3d_pts.pts.points)[0,:]
-print(" o3d center: ", center_point)
-Query_.all_process(center_point)
-PrMap_.all_process(center_point)
+points_index2Remove = []
+TIC()
+for i in range(90,106):
+    print(f"===================================== id {i} now... ")
+    pose = df.values[i][2:]
+    wxyz = np.array([pose[6],pose[3],pose[4],pose[5]])
+    T_Q = np.eye(4)
+    T_Q[:3,:3] = quat2mat(wxyz)
+    T_Q[:3,-1]= np.array([pose[0],pose[1],pose[2]])
 
-Query2d = Query_.rayT_2d()
-# Query2d = 1 - Query_.binT_2d # for bin methods
-KL_Matrix = np.zeros((Query_.dim_2d, Query_.dim_2d))
-## 6. The grid have one calculate the KL Diversity
-QdP = Query2d * PrMap_.binT_2d
-Grids_Trigger_KL = list(zip(*np.where(QdP == 1)))
+    Query_ = process_pts(f"data/bin/TPB/{i:06d}.bin", range_m, resolution, T_MATRIX=T_Q)
+    # debug: make sure the aglignment is corrected
+    # Query_.o3d_pts.view_compare(Query_.o3d_pts.pts, PrMap_.o3d_pts.pts)
+    center_point = np.array(Query_.o3d_pts.pts.points)[0,:]
+    print(" o3d center: ", center_point)
+    Query_.all_process(center_point)
+    PrMap_.all_process(center_point)
 
-for item in Grids_Trigger_KL:
-    Q_pts_id = Query_.twoD2ptindex[item[0]][item[1]]
-    M_pts_id = PrMap_.twoD2ptindex[item[0]][item[1]]
-    Q_Prob = calGMM(Query_.points[Q_pts_id][:,Z_AXIS].reshape(-1,1)) # Q_Prob: u1, u2, s1, s2 which is 2 gaussian
-    M_Prob = calGMM(PrMap_.points[M_pts_id][:,Z_AXIS].reshape(-1,1))
-    KL_Matrix[item[0]][item[1]] = gmm_kl(Q_Prob, M_Prob)
+    Query2d = Query_.rayT_2d()
+    # Query2d = 1 - Query_.binT_2d # for bin methods
+    KL_Matrix = np.zeros((Query_.dim_2d, Query_.dim_2d))
+    ## 6. The grid have one calculate the KL Diversity
+    QdP = Query2d * PrMap_.binT_2d
+    Grids_Trigger_KL = list(zip(*np.where(QdP == 1)))
+
+    for item in Grids_Trigger_KL:
+        Q_pts_id = Query_.twoD2ptindex[item[0]][item[1]]
+        M_pts_id = PrMap_.twoD2ptindex[item[0]][item[1]]
+        Q_Prob = calGMM(Query_.points[Q_pts_id][:,Z_AXIS].reshape(-1,1)) # Q_Prob: u1, u2, s1, s2 which is 2 gaussian
+        M_Prob = calGMM(PrMap_.points[M_pts_id][:,Z_AXIS].reshape(-1,1))
+        KL_Matrix[item[0]][item[1]] = gmm_kl(Q_Prob, M_Prob)
 
 
-# TODO: view the Matrix with the pts also?
-## 7. Difference Show to view the distribution with heatmap
-fig, axs = plt.subplots(2, 2, figsize=(8,8))
-axs[0,0].imshow(Query2d, cmap='hot', interpolation='nearest')
-axs[0,0].set_title('Query pts ray 2d')
-axs[0,1].imshow(PrMap_.binT_2d, cmap='hot', interpolation='nearest')
-axs[0,1].set_title('Prior Map bin 2d')
-axs[1,0].imshow(QdP, cmap='hot', interpolation='nearest')
-axs[1,0].set_title('Query ray times Prori Map')
-axs[1,1].imshow(np.clip(KL_Matrix, 0, 10), cmap='hot', interpolation='nearest')
-axs[1,1].set_title('KL Matrix after normalization')
-plt.show()
+    # # TODO: view the Matrix with the pts also?
+    # ## 7. Difference Show to view the distribution with heatmap
+    # fig, axs = plt.subplots(2, 2, figsize=(8,8))
+    # axs[0,0].imshow(Query2d, cmap='hot', interpolation='nearest')
+    # axs[0,0].set_title('Query pts ray 2d')
+    # axs[0,1].imshow(PrMap_.binT_2d, cmap='hot', interpolation='nearest')
+    # axs[0,1].set_title('Prior Map bin 2d')
+    # axs[1,0].imshow(Query_.binT_2d, cmap='hot', interpolation='nearest')
+    # axs[1,0].set_title('Query bin map')
+    # axs[1,1].imshow(np.clip(KL_Matrix, 0, 10), cmap='hot', interpolation='nearest')
+    # axs[1,1].set_title('KL Matrix after normalization')
+    # plt.show()
 
-if len(Grids_Trigger_KL)!=0:
-    ## 8. remove the xy bins output the Global Map
-    # How to set the threshold??
-    Grids_Trigger_KL2pt = list(zip(*np.where(KL_Matrix > 0)))
-    # Grids_Trigger_KL2pt = list(zip(*np.where(PrMap_.M_2d > 0)))
-    points_index2Remove = []
-    for item in Grids_Trigger_KL2pt:
-        # TODO if possible, do prediction here also for low probability point remove
-        Remove_ptid = PrMap_.twoD2ptindex[item[0]][item[1]]
-        points_index2Remove = points_index2Remove + Remove_ptid
+    if len(Grids_Trigger_KL)!=0:
+        ## 8. remove the xy bins output the Global Map
+        # How to set the threshold??
+        Grids_Trigger_KL2pt = list(zip(*np.where(KL_Matrix > 0)))
 
-    inlier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove)
-    oulier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove, invert=True)
-    PrMap_.o3d_pts.view_compare(inlier_cloud, oulier_cloud, Query_.o3d_pts.rmg_pts)
+        for item in Grids_Trigger_KL2pt:
+            # TODO if possible, do prediction here also for low probability point remove
+            Remove_ptid = PrMap_.twoD2ptindex[item[0]][item[1]]
+            points_index2Remove = points_index2Remove + Remove_ptid
+
+inlier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove)
+oulier_cloud = PrMap_.o3d_pts.rmg_pts.select_by_index(points_index2Remove, invert=True) + PrMap_.o3d_pts.ground_pts
+TOC("All processes")
+PrMap_.o3d_pts.view_compare(inlier_cloud, oulier_cloud, Query_.o3d_pts.rmg_pts)
 
 print("All codes run successfully, Close now..")
