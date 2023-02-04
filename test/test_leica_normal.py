@@ -14,14 +14,6 @@ sys.path.append(BASE_DIR)
 
 from utils import RayOutside, quat2mat
 from utils.global_def import *
-import pandas as pd
+from utils.pts_read import Points
 
-# df = pd.read_csv('data/TPB_poses_lidar2body.csv')
-# pose = df.values[100][2:]
-# wxyz = np.array([pose[6],pose[3],pose[4],pose[5]])
-# T_Q = np.eye(4)
-# T_Q[:3,:3] = quat2mat(wxyz)
-# T_Q[:3,-1]= np.array([pose[0],pose[1],pose[2]])
-
-Query_ = process_pts("data/bin/TPB_000100.bin", range_m, resolution, T_MATRIX=T_Q)
-PrMap_ = process_pts("data/bin/TPB_global_map.bin", range_m, resolution)
+Query_ = Points("data/bin/TPB_000100.bin")

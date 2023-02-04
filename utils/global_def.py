@@ -52,3 +52,11 @@ class bc:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+# reference: https://stackoverflow.com/questions/26079881/kl-divergence-of-two-gmms?noredirect=1&lq=1
+# TODO sample again not smart way? is there any continues way to do that?
+def gmm_kl(gmm_p, gmm_q, n_samples=10**3):
+    X = gmm_p.sample(n_samples)
+    log_p_X = gmm_p.score_samples(X[0])
+    log_q_X = gmm_q.score_samples(X[0])
+    return log_p_X.mean() - log_q_X.mean()

@@ -74,7 +74,7 @@ class o3d_point:
         o3d.visualization.draw_geometries([pts])
         
 class process_pts:
-    def __init__(self, file, range_m, resolution, T_MATRIX=np.eye(4), sh=0.8):
+    def __init__(self, file, range_m, resolution, T_MATRIX=np.eye(4)):
         self.MAP_FLAG = False
         ## 0. Read Point Cloud
         TIC()
