@@ -32,14 +32,28 @@ class Points:
         self.bin_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
         self.binary_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
 
-    def transform_from_TF_Matrix(self, T_MATRIX=np.eye(4)):
-        return
-    def centerlise_all_pts(self, center=np.array([0,0,0])):
-        self.points = self.points[:,:3] - center
+        # open3d
         self.o3d_pts = o3d.geometry.PointCloud()
         self.o3d_pts.points = o3d.utility.Vector3dVector(self.points[:,:3])
         self.points = np.asarray(self.o3d_pts.points)
-        
+
+    def clear_result(self, id=0):
+        print(f"Clear result =============> id: {id} ===============>")
+        # results
+        self.twoD2ptindex = defaultdict(lambda  : defaultdict(list))
+        self.gmmFitMatrix = defaultdict(lambda  : defaultdict(list))
+        self.bin_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
+        self.binary_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
+        self.points = np.asarray(self.o3d_pts.points)
+
+    def transform_from_TF_Matrix(self, T_MATRIX=np.eye(4)):
+        self.points = np.insert(self.points, 0, np.array([0,0,0]),axis=0)
+        self.o3d_pts.transform(T_MATRIX)
+        self.points = np.asarray(self.o3d_pts.points)
+
+    def centerlise_all_pts(self, center=np.array([0,0,0])):
+        self.points = self.points[:,:3] - center
+        print(f"number of points: {self.points.shape}")
 
     def from_center_to_2d_grid(self, center=np.array([0,0,0])):
         '''
@@ -64,7 +78,7 @@ class Points:
         '''
         ## 2. Voxelize STACK TO 2D
         idxy = (np.divide(self.points - center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)
-        idz = (np.divide(self.points[...,2], self.h_res)).astype(int)
+        self.idz = (np.divide(self.points[...,2] - center[2], self.h_res)).astype(int) + 5
         self.M_2d = np.zeros((self.dim_2d, self.dim_2d))
         
         self.pts1idxy = []
@@ -74,8 +88,8 @@ class Points:
                 # 500.167847 ms -> 643.996239 ms
                 self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
                 # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
-                if not(idz[i]>62 or idz[i]<0):
-                    self.binary_2d[ptidxy[0]][ptidxy[1]] = self.binary_2d[ptidxy[0]][ptidxy[1]] | (1<<(idz[i]).astype(int))
+                if not(self.idz[i]>62 or self.idz[i]<0):
+                    self.binary_2d[ptidxy[0]][ptidxy[1]] = self.binary_2d[ptidxy[0]][ptidxy[1]] | (1<<(self.idz[i]).astype(int))
         TOC("Stack to 2D")
 
     def select_data_from_2DptIndex(self, i, j):
@@ -103,14 +117,14 @@ class Points:
         return self.o3d_pts.select_by_index(index_list, invert=invert)
     
     @staticmethod
-    def view_compare(inlier, outlier, others=None):
+    def view_compare(inlier, outlier, others=None, view_file = None):
         view_things = [outlier]
         if others is not None:
             others.paint_uniform_color([0.0, 0.0, 0.0])
             view_things.append(others)
         inlier.paint_uniform_color([1.0, 0, 0])
         view_things.append(inlier)
-        load_view_point(view_things, "data/o3d_view/lecai_viewpoint.json")
+        load_view_point(view_things, filename=view_file)
     
     @staticmethod
     def view(pts):
