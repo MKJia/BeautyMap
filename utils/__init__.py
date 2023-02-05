@@ -19,13 +19,16 @@ def save_view_point(viewThings: list, filename):
     vis.destroy_window()
 
 
-def load_view_point(viewThings: list, filename):
+def load_view_point(viewThings: list, filename=None):
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     ctr = vis.get_view_control()
     for sth in viewThings:
         vis.add_geometry(sth)
-    o3d_vctrl = ViewControl(ctr, filename)
+    
+    if filename is not None:
+        o3d_vctrl = ViewControl(ctr, filename)
+    
     vis.run()
     vis.destroy_window()
 

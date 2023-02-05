@@ -14,7 +14,7 @@ from utils.global_def import *
 
 from collections import defaultdict
 class Points:
-    def __init__(self, file, range_m, resolution):
+    def __init__(self, file, range_m, resolution, h_res=0.5):
         ## 0. Read Point Cloud
         TIC()
         self.points = np.fromfile(file, dtype=np.float32).reshape(-1, 4)
@@ -24,11 +24,13 @@ class Points:
         self.range_m = range_m
         self.resolution = resolution
         self.dim_2d = (int)(range_m/resolution)
+        self.h_res = h_res
 
         # results
         self.twoD2ptindex = defaultdict(lambda  : defaultdict(list))
         self.gmmFitMatrix = defaultdict(lambda  : defaultdict(list))
-        self.bin_2d = np.zeros((self.dim_2d, self.dim_2d))
+        self.bin_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
+        self.binary_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
 
     def transform_from_TF_Matrix(self, T_MATRIX=np.eye(4)):
         return
@@ -55,8 +57,37 @@ class Points:
                 # 500.167847 ms -> 643.996239 ms
                 self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
         TOC("Stack to 2D")
+
+    def from_center_to_2d_binary(self, center=np.array([0,0,0])):
+        '''
+        output: 2d dict but save the points' index in the 2d grid.
+        '''
+        ## 2. Voxelize STACK TO 2D
+        idxy = (np.divide(self.points - center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)
+        idz = (np.divide(self.points[...,2], self.h_res)).astype(int)
+        self.M_2d = np.zeros((self.dim_2d, self.dim_2d))
+        
+        self.pts1idxy = []
+        for i, ptidxy in enumerate(idxy):
+            if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>=0 and ptidxy[0]>=0:
+                self.M_2d[ptidxy[0]][ptidxy[1]] = 1
+                # 500.167847 ms -> 643.996239 ms
+                self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
+                # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
+                if not(idz[i]>62 or idz[i]<0):
+                    self.binary_2d[ptidxy[0]][ptidxy[1]] = self.binary_2d[ptidxy[0]][ptidxy[1]] | (1<<(idz[i]).astype(int))
+        TOC("Stack to 2D")
+
     def select_data_from_2DptIndex(self, i, j):
         return self.points[self.twoD2ptindex[i][j]]
+
+    def exclusive_with_other_binary_2d(self, compare_b2):
+        '''
+        output: 2d dict but save the points' index in the 2d grid.
+        '''
+        # compute the exclusive or
+        return self.binary_2d ^ compare_b2
+        
     def gmm_fit(self):
         Grids_Trigger = list(zip(*np.where(self.M_2d == 1)))
         TIC()
@@ -67,16 +98,20 @@ class Points:
                 self.bin_2d[i][j] = 1
         TOC("GMM Fits")
         return
+    
     def select_by_index(self, index_list, invert=False):
         return self.o3d_pts.select_by_index(index_list, invert=invert)
-
-    def view_compare(self, inlier, outlier, others=None):
+    
+    @staticmethod
+    def view_compare(inlier, outlier, others=None):
         view_things = [outlier]
         if others is not None:
             others.paint_uniform_color([0.0, 0.0, 0.0])
             view_things.append(others)
         inlier.paint_uniform_color([1.0, 0, 0])
         view_things.append(inlier)
-        load_view_point(view_things, "data/o3d_view/TPB.json")
-    def view(self,pts):
+        load_view_point(view_things, "data/o3d_view/lecai_viewpoint.json")
+    
+    @staticmethod
+    def view(pts):
         o3d.visualization.draw_geometries([pts])

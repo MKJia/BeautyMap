@@ -36,24 +36,20 @@ df = pd.read_csv('data/kth_scan_poses.csv')
 center = np.array(df.values[1][1:4], dtype=float) + offset
 print("point center is ", center)
 Qpts.centerlise_all_pts(center)
-Qpts.from_center_to_2d_grid()
-Qpts.gmm_fit()
+Qpts.from_center_to_2d_binary()
 Mpts.centerlise_all_pts(center)
-Mpts.from_center_to_2d_grid()
+Mpts.from_center_to_2d_binary()
+binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.binary_2d)
+trigger = (~Qpts.binary_2d) & binary_xor
 
-KL_Matrix = np.zeros((Qpts.dim_2d, Qpts.dim_2d))
-Grids_Trigger = list(zip(*np.where((Qpts.bin_2d * Mpts.M_2d) == 1)))
-for (i ,j) in Grids_Trigger:
-    # KL_Matrix[i][j] = gmm_kl(Qpts.gmmFitMatrix[i][j], Mpts.gmmFitMatrix[i][j])
-    proba = Qpts.gmmFitMatrix[i][j].predict_proba(Mpts.select_data_from_2DptIndex(i,j)[:,2].reshape(-1,1))
-    Remove_ = (proba[:,0] < PThreshold) * (proba[:,1] < PThreshold)
-    indexOn2D = list(*np.where((Remove_ == True)))
-    points_index2Remove = points_index2Remove + list(np.array(Mpts.twoD2ptindex[i][j])[indexOn2D])
-        
-inlier_cloud = Mpts.select_by_index(points_index2Remove)
-oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True)
-Mpts.view_compare(inlier_cloud, oulier_cloud)
-TOC("All processes")
+# TODO!!! continue here!!
+# for (i,j) in list(zip(*np.where(trigger != 0))):
+    # trigger[i][j]
+    
+# inlier_cloud = Mpts.select_by_index(points_index2Remove)
+# oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True)
+# Mpts.view_compare(inlier_cloud, oulier_cloud)
+# TOC("All processes")
 # # pts = Points("data/bin/TPB_000100.bin", RANGE, RESOLUTION)
 # # pts.centerlise_all_pts()
 # # pts.from_center_to_2d_grid()
