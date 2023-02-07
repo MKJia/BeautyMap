@@ -50,6 +50,9 @@ for id_ in range(90,93):
     binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.binary_2d)
     trigger = (~Qpts.binary_2d) & binary_xor
 
+    trigger = trigger & (trigger - 1) # for h_res = 0.5
+    # trigger = trigger & (trigger - 1)
+
     for (i,j) in list(zip(*np.where(trigger != 0))):
         for k in Mpts.twoD2ptindex[i][j]:
             if_delete = trigger[i][j] & (1<<Mpts.idz[k] if not(Mpts.idz[k]>62 or Mpts.idz[k]<0) else 0)
