@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from utils.global_def import *
 from utils.pts_read import Points
 
-RANGE = 30 # m, from cetner point to an square
+RANGE = 50 # m, from cetner point to an square
 RESOLUTION = 2 # m, resolution default 1m
 offset = np.array([(-154100.0, -6581400.0, 0)])
 
@@ -30,7 +30,7 @@ Mpts = Points("data/bin/KTH_1A2.bin", RANGE, RESOLUTION)
 for id_ in range(1,4):
     Mpts.clear_result(id_)
     Qpts = Points(f"data/bin/KTH_00{id_}.bin", RANGE, RESOLUTION)
-    
+
     df = pd.read_csv('data/kth_scan_poses.csv')
     center = np.array(df.values[id_-1][1:4], dtype=float) + offset
     print("point center is ", center)
@@ -41,9 +41,22 @@ for id_ in range(1,4):
     Mpts.from_center_to_2d_binary()
 
     binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.binary_2d)
-    trigger = (~Qpts.binary_2d) & binary_xor
+    trigger = (~Qpts.binary_2d) & binary_xor & Mpts.binary_2d
+    # trigger = trigger & (trigger - 1)
+
+    fig, axs = plt.subplots(2, 2, figsize=(8,8))
+    axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
+    axs[0,0].set_title('Query 2d')
+    axs[0,1].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
+    axs[0,1].set_title('Prior Map bin 2d')
+    axs[1,0].imshow(np.log(trigger), cmap='hot', interpolation='nearest')
+    axs[1,0].set_title('After xor')
+    plt.show()
 
     for (i,j) in list(zip(*np.where(trigger != 0))):
+        max_obj_length = trigger[i][j] & (trigger[i][j]<<5)
+        if max_obj_length != 0:
+            trigger[i][j] = trigger[i][j] & (~max_obj_length)& (~max_obj_length>>1)& (~max_obj_length>>2)& (~max_obj_length>>3)& (~max_obj_length>>4)& (~max_obj_length>>5)
         for k in Mpts.twoD2ptindex[i][j]:
             if_delete = trigger[i][j] & (1<<Mpts.idz[k] if not(Mpts.idz[k]>62 or Mpts.idz[k]<0) else 0)
             if if_delete!=0:
