@@ -7,7 +7,7 @@
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
 This file is for open3d view control set from view_file, which should be json
-1. use normal way to open any gemotry and set view by mouse you want
+1. use normal way to open any geometry and set view by mouse you want
 2. `CTRL+C` it will copy the view detail at this moment.
 3. `CTRL+V` to json file, you can create new one
 4. give the json file path
