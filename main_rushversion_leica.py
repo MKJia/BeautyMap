@@ -21,6 +21,7 @@ from utils.pts_read import Points
 
 RANGE = 50 # m, from cetner point to an square
 RESOLUTION = 2 # m, resolution default 1m
+RANGE_LEICA = 80
 offset = np.array([(-154100.0, -6581400.0, 0)])
 
 TIC()
@@ -40,8 +41,21 @@ for id_ in range(1,4):
     Mpts.centerlise_all_pts(center)
     Mpts.from_center_to_2d_binary()
 
+    # pre-process
+
+    #RPG
+    Qpts.RPGMat = Qpts.smoother()
+    Qpts.RPGMask = Qpts.RPGMat > RESOLUTION**2 * 100
+
+    #DEAR
+    Qpts.RangeMask = Qpts.generate_range_mask(int(RANGE_LEICA/RESOLUTION))
+
+
     binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.binary_2d)
     trigger = (~Qpts.binary_2d) & binary_xor & Mpts.binary_2d
+
+    trigger &= ~(Qpts.RPGMask - 1)
+    trigger &= ~(Qpts.RangeMask - 1)
     # trigger = trigger & (trigger - 1)
 
     fig, axs = plt.subplots(2, 2, figsize=(8,8))
@@ -49,8 +63,10 @@ for id_ in range(1,4):
     axs[0,0].set_title('Query 2d')
     axs[0,1].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
     axs[0,1].set_title('Prior Map bin 2d')
-    axs[1,0].imshow(np.log(trigger), cmap='hot', interpolation='nearest')
-    axs[1,0].set_title('After xor')
+    axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
+    axs[1,0].set_title('After RPG')
+    axs[1,1].imshow(Qpts.RangeMask, cmap='hot', interpolation='nearest')
+    axs[1,1].set_title('After RPG Mask')
     plt.show()
 
     for (i,j) in tqdm(list(zip(*np.where(trigger != 0))), desc=f"frame id {id_}: grids traverse"):

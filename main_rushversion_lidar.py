@@ -22,6 +22,7 @@ from utils import quat2mat
 
 RANGE = 10 # m, from cetner point to an square
 RESOLUTION = 0.5 # m, resolution default 1m
+RANGE_16_RING = 8
 
 TIC()
 points_index2Remove = []
@@ -47,11 +48,36 @@ for id_ in range(90,93):
     Mpts.centerlise_all_pts(center)
     Mpts.from_center_to_2d_binary()
 
+    # pre-process
+
+    # RPG
+    Qpts.RPGMat = Qpts.smoother()
+    Qpts.RPGMask = Qpts.RPGMat > RESOLUTION**2 * 100
+
+    # DEAR
+    Qpts.RangeMask = Qpts.generate_range_mask(int(RANGE_16_RING/RESOLUTION))
+    # Qpts.SightMask = TODO: generate sight mask
+    # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
+
     binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.binary_2d)
     trigger = (~Qpts.binary_2d) & binary_xor
 
     trigger = trigger & (trigger - 1) # for h_res = 0.5
     # trigger = trigger & (trigger - 1)
+    trigger &= ~(Qpts.RPGMask - 1)
+    trigger &= ~(Qpts.RangeMask - 1)
+
+    fig, axs = plt.subplots(2, 2, figsize=(8,8))
+    axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
+    axs[0,0].set_title('Query 2d')
+    axs[0,1].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
+    axs[0,1].set_title('Prior Map bin 2d')
+    axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
+    axs[1,0].set_title('After RPG')
+    axs[1,1].imshow(Qpts.RangeMask, cmap='hot', interpolation='nearest')
+    axs[1,1].set_title('After RPG Mask')
+    plt.show()
+
 
     for (i,j) in list(zip(*np.where(trigger != 0))):
         for k in Mpts.twoD2ptindex[i][j]:
