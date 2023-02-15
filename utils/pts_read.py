@@ -80,11 +80,13 @@ class Points:
         idxy = (np.divide(self.points - center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)
         self.idz = (np.divide(self.points[...,2] - center[2], self.h_res)).astype(int) + 5
         self.M_2d = np.zeros((self.dim_2d, self.dim_2d))
+        self.N_2d = np.zeros((self.dim_2d, self.dim_2d))
         
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
             if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>=0 and ptidxy[0]>=0:
                 self.M_2d[ptidxy[0]][ptidxy[1]] = 1
+                self.N_2d[ptidxy[0]][ptidxy[1]] += 1
                 # 500.167847 ms -> 643.996239 ms
                 self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
                 # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
@@ -115,7 +117,21 @@ class Points:
     
     def select_by_index(self, index_list, invert=False):
         return self.o3d_pts.select_by_index(index_list, invert=invert)
-    
+
+    def smoother(self):
+        m,n = len(self.N_2d), len(self.N_2d[0])
+        res = [[0] * n for _ in range(m)]
+        for i in range(m):
+            for j in range(n):
+                count = 0
+                for x in range(i-1, i+2):
+                    for y in range(j-1, j+2):
+                        if 0 <= x < m and 0 <= y < n:
+                            res[i][j] += self.N_2d[x][y]
+                            count += 1
+                res[i][j] //= count
+        return np.asarray(res,dtype='int')
+
     @staticmethod
     def view_compare(inlier, outlier, others=None, view_file = None):
         view_things = [outlier]
