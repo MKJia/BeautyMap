@@ -184,6 +184,14 @@ class Points:
                 res[i][j] //= count
         return np.asarray(res,dtype='int')
 
+    def generate_range_mask(self, r):
+        self.range_mask = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
+        i = j = (self.dim_2d - r)//2
+        for x in range(i, i+r):
+            for y in range(j, j+r):
+                self.range_mask[x][y] = 1
+        return self.range_mask
+
     @staticmethod
     def view_compare(inlier, outlier, others=None, view_file = None):
         view_things = [outlier]
