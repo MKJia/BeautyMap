@@ -1,4 +1,5 @@
 # Created: 2023-2-2 11:20
+# Update:  2023-2-14 23:21
 # Copyright (C) 2022-now, RPL, KTH Royal Institute of Technology
 # Author: Kin ZHANG  (https://kin-zhang.github.io/)
 
@@ -25,7 +26,7 @@ from utils.global_def import *
 from utils.pts_read import Points
 
 RANGE = 30 # m, from cetner point to an square
-RESOLUTION = 2 # m, resolution default 1m
+RESOLUTION = 5 # m, resolution default 1m
 offset = np.array([-154100.0, -6581400.0, 0])
 
 TIC()

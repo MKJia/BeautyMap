@@ -9,7 +9,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
-
+from tqdm import tqdm
 # vis
 import open3d as o3d
 o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
@@ -53,7 +53,7 @@ for id_ in range(1,4):
     axs[1,0].set_title('After xor')
     plt.show()
 
-    for (i,j) in list(zip(*np.where(trigger != 0))):
+    for (i,j) in tqdm(list(zip(*np.where(trigger != 0))), desc=f"frame id {id_}: grids traverse"):
         max_obj_length = trigger[i][j] & (trigger[i][j]<<5)
         if max_obj_length != 0:
             trigger[i][j] = trigger[i][j] & (~max_obj_length)& (~max_obj_length>>1)& (~max_obj_length>>2)& (~max_obj_length>>3)& (~max_obj_length>>4)& (~max_obj_length>>5)
