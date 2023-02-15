@@ -66,7 +66,8 @@ class Points:
         '''
         output: 2d dict but save the points' index in the 2d grid.
         '''
-        self.points = self.points[:,:3] - center
+        self.global_center = center
+        self.points = self.points[:,:3] - self.global_center
         ## 1. save max min for range, refresh the range based on max and min
         self.max_xyz = np.array([max(abs(self.points[...,0])), max(abs(self.points[...,1])), max(abs(self.points[...,2]))])
         # self.min_xyz = np.array([min(abs(self.points[...,0])), min(abs(self.points[...,1])), min(self.points[...,2])])
@@ -97,7 +98,7 @@ class Points:
         input: q_dim means query frame dimension, it should be different value
         output: 2d dict but save the points' index in the 2d grid.
         '''
-        self.center_xy_id =(np.divide(center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)[:2]
+        self.center_xy_id =(np.divide(center - self.global_center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)[:2]
         # bqc: based on Query center, maybe BUG HERE need padding if exceed the max range
         self.bqc_binary_2d = np.zeros((q_dim, q_dim), dtype=int)
         self.bqc_binary_2d = self.binary_2d[
