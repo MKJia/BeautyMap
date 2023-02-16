@@ -192,6 +192,44 @@ class Points:
                 self.range_mask[x][y] = 1
         return self.range_mask
 
+    def set_pts_morton_id(self):
+            x = np.asarray(self.points[:,0] / self.resolution,dtype='int')
+            y = np.asarray(self.points[:,1] / self.resolution,dtype='int')
+            z = np.asarray(self.points[:,2] / self.h_res,dtype='int')
+            out = x * 0
+            for xx in [z,y,x]:
+                xx = (xx | (xx << 16)) & 0x030000FF
+                xx = (xx | (xx <<  8)) & 0x0300F00F
+                xx = (xx | (xx <<  4)) & 0x030C30C3
+                xx = (xx | (xx <<  2)) & 0x09249249
+                out |= xx
+                out << 1
+            self.points_with_id = np.c_[self.points, out]
+            self.points_with_id = self.points_with_id[np.argsort(self.points_with_id[:,3], ),:]
+            print(self.points_with_id[:,3])
+
+    def get_gid_from_morton_id(self, input):
+        x = input &        0x09249249
+        y = (input >> 1) & 0x09249249
+        z = (input >> 2) & 0x09249249
+
+        x = ((x >> 2) | x) & 0x030C30C3
+        x = ((x >> 4) | x) & 0x0300F00F
+        x = ((x >> 8) | x) & 0x030000FF
+        x = ((x >>16) | x) & 0x000003FF
+
+        y = ((y >> 2) | y) & 0x030C30C3
+        y = ((y >> 4) | y) & 0x0300F00F
+        y = ((y >> 8) | y) & 0x030000FF
+        y = ((y >>16) | y) & 0x000003FF
+
+        z = ((z >> 2) | z) & 0x030C30C3
+        z = ((z >> 4) | z) & 0x0300F00F
+        z = ((z >> 8) | z) & 0x030000FF
+        z = ((z >>16) | z) & 0x000003FF
+
+        return [x,y,z]
+
     @staticmethod
     def view_compare(inlier, outlier, others=None, view_file = None):
         view_things = [outlier]
