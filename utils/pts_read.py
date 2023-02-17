@@ -7,6 +7,7 @@
 
 # math
 import numpy as np
+np.set_printoptions(threshold=np.inf)
 from sklearn.mixture import GaussianMixture
 RANDOM_SEED = 2023
 
@@ -205,6 +206,8 @@ class Points:
             self.idy = self.idy[np.where(tmp != 0)]
             self.idz = self.idz[np.where(tmp != 0)]
             self.points = self.points[np.where(tmp != 0)]
+            self.idxyz = np.c_[self.idx, self.idy, self.idz]
+
             out = self.idx * 0
 
             for xx in [self.idz,self.idy,self.idx]:
@@ -214,9 +217,15 @@ class Points:
                 xx = (xx | (xx <<  2)) & 0x09249249
                 out |= xx
                 out << 1
+            # t = time.time()
+            # tt = time.time()
+            # print(1000*(tt-t))
+            self.points_with_id = np.c_[self.points, out, self.idxyz]
+            self.points_with_id = self.points_with_id[np.lexsort([self.idy, self.idx])]
+            _, unique_id = np.unique(self.idxyz, return_index=True, axis=0)
+            self.unique_pts_with_id = self.points_with_id[unique_id]
 
-            self.points_with_id = np.c_[self.points, out]
-            self.points_with_id = self.points_with_id[np.argsort(self.points_with_id[:,3], ),:]
+            print(self.points_with_id)
 
     def get_xyz_from_morton_id(self, input):
         x = input &        0x09249249
@@ -245,25 +254,40 @@ class Points:
         output: 2d dict but save the points' index in the 2d grid.
         '''
 
-        self.M_2d = np.zeros((self.dim_2d, self.dim_2d))
-        self.N_2d = np.zeros((self.dim_2d, self.dim_2d))
+        self.M_2d = np.zeros((self.dim_2d, self.dim_2d),dtype='int')
+        self.N_2d = np.zeros((self.dim_2d, self.dim_2d),dtype='int')
+        self.binary_2d = np.zeros((self.dim_2d, self.dim_2d),dtype='int')
         
         cidx, cidy, cidz = (center / [self.resolution, self.resolution, self.h_res]).astype(int)
-        self.idx_c = self.idx - cidx + self.dim_2d//2
-        self.idy_c = self.idy - cidy + self.dim_2d//2
-        self.idz_c = self.idz - cidz + self.dim_2d//2
+        self.unique_pts_with_id[...,4] = self.unique_pts_with_id[...,4] - cidx + self.dim_2d//2
+        self.unique_pts_with_id[...,5] = self.unique_pts_with_id[...,5] - cidx + self.dim_2d//2
+        self.unique_pts_with_id[...,6] = self.unique_pts_with_id[...,6] - cidx + self.dim_2d//2
+        
 
-        for i in range(len(self.points)):
-            if self.idx_c[i] < self.dim_2d and self.idy_c[i]<self.dim_2d and self.idy_c[i]>=0 and self.idx_c[i]>=0:
-                self.M_2d[self.idx_c[i]][self.idy_c[i]] = 1
-                self.N_2d[self.idx_c[i]][self.idy_c[i]] += 1
+        for i in range(len(self.unique_pts_with_id)):
+            tmpx = self.unique_pts_with_id[i][4].astype(int)
+            tmpy = self.unique_pts_with_id[i][5].astype(int)
+            tmpz = self.unique_pts_with_id[i][6].astype(int)
+
+            if tmpx < self.dim_2d and tmpy<self.dim_2d and tmpy>=0 and tmpx>=0:
+                self.M_2d[tmpx][tmpy] = 1
+                # self.N_2d[self.unique_pts_with_id[i]][tmpy] += 1
                 # 500.167847 ms -> 643.996239 ms
-                self.twoD2ptindex[self.idx_c[i]][self.idy_c[i]].append(i)
+                self.twoD2ptindex[tmpx][tmpy].append(i)
                 # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
-                if not(self.idz_c[i]>62 or self.idz_c[i]<0):
-                    self.binary_2d[self.idx_c[i]][self.idy_c[i]] = self.binary_2d[self.idx_c[i]][self.idy_c[i]] | (1<<(self.idz_c[i]).astype(int))
-        TOC("Stack to binary 2D")
+                if not(tmpz>62 or tmpz<0):
+                    self.binary_2d[tmpx][tmpy] = self.binary_2d[tmpx][tmpy] | (1<<(tmpz).astype(int))
 
+        # for i in range(self.dim_2d):
+        #     for j in range(self.dim_2d):
+        #         if(np.isin(i,self.idx_c) and np.isin(j,self.idy_c)):
+        #             self.M_2d[i][j] = 1
+        #             in_grid_pts_id = np.where(self.idx_c==i,1,0) * np.where(self.idy_c==j,1,0)
+        #             self.N_2d[i][j] = np.sum(in_grid_pts_id)
+        #             for k in range(63):
+        #                 if(np.isin(k,self.idz_c)):
+        #                     self.binary_2d[i][j] = self.binary_2d[i][j] | (1<<(self.idz_c[i]).astype(int))
+        TOC("Stack to binary 2D") 
 
 
     @staticmethod
