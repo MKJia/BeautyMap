@@ -55,6 +55,7 @@ class Points:
 
     def transform_from_TF_Matrix(self, T_MATRIX=np.eye(4)):
         self.points = np.insert(self.points, 0, np.array([0,0,0]),axis=0)
+        self.o3d_pts.points = o3d.utility.Vector3dVector(self.points[:,:3])
         self.o3d_pts.transform(T_MATRIX)
         self.points = np.asarray(self.o3d_pts.points)
 
@@ -83,13 +84,13 @@ class Points:
 
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
-            if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>=0 and ptidxy[0]>=0:
-                self.M_2d[ptidxy[0]][ptidxy[1]] = 1
+            if self.idx[i] < self.dim_2d and self.idy[i]<self.dim_2d and self.idy[i]>=0 and self.idx[i]>=0:
+                self.M_2d[self.idx[i]][self.idy[i]] = 1
                 # 500.167847 ms -> 643.996239 ms
-                self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
+                self.twoD2ptindex[self.idx[i]][self.idy[i]].append(i)
                 # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
                 if not(self.idz[i]>62 or self.idz[i]<0):
-                    self.binary_2d[ptidxy[0]][ptidxy[1]] = self.binary_2d[ptidxy[0]][ptidxy[1]] | (1<<(self.idz[i]).astype(int))
+                    self.binary_2d[self.idx[i]][self.idy[i]] = self.binary_2d[self.idx[i]][self.idy[i]] | (1<<(self.idz[i]).astype(int))
         TOC("Global Map Stack to 2D")
 
     def SelectMap_based_on_Query_center(self, q_dim, center=np.array([0,0,0])):
@@ -117,10 +118,10 @@ class Points:
         
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
-            if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>=0 and ptidxy[0]>=0:
-                self.M_2d[ptidxy[0]][ptidxy[1]] = 1
+            if self.idx[i] < self.dim_2d and self.idy[i]<self.dim_2d and self.idy[i]>=0 and self.idx[i]>=0:
+                self.M_2d[self.idx[i]][self.idy[i]] = 1
                 # 500.167847 ms -> 643.996239 ms
-                self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
+                self.twoD2ptindex[self.idx[i]][self.idy[i]].append(i)
         TOC("Stack to 2D grid")
 
     def from_center_to_2d_binary(self, center=np.array([0,0,0])):
@@ -136,14 +137,14 @@ class Points:
         
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
-            if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>=0 and ptidxy[0]>=0:
-                self.M_2d[ptidxy[0]][ptidxy[1]] = 1
-                self.N_2d[ptidxy[0]][ptidxy[1]] += 1
+            if self.idx[i] < self.dim_2d and self.idy[i]<self.dim_2d and self.idy[i]>=0 and self.idx[i]>=0:
+                self.M_2d[self.idx[i]][self.idy[i]] = 1
+                self.N_2d[self.idx[i]][self.idy[i]] += 1
                 # 500.167847 ms -> 643.996239 ms
-                self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
+                self.twoD2ptindex[self.idx[i]][self.idy[i]].append(i)
                 # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
                 if not(self.idz[i]>62 or self.idz[i]<0):
-                    self.binary_2d[ptidxy[0]][ptidxy[1]] = self.binary_2d[ptidxy[0]][ptidxy[1]] | (1<<(self.idz[i]).astype(int))
+                    self.binary_2d[self.idx[i]][self.idy[i]] = self.binary_2d[self.idx[i]][self.idy[i]] | (1<<(self.idz[i]).astype(int))
         TOC("Stack to binary 2D")
 
     def select_data_from_2DptIndex(self, i, j):
@@ -192,23 +193,32 @@ class Points:
                 self.range_mask[x][y] = 1
         return self.range_mask
 
-    def set_pts_morton_id(self):
-            x = np.asarray(self.points[:,0] / self.resolution,dtype='int')
-            y = np.asarray(self.points[:,1] / self.resolution,dtype='int')
-            z = np.asarray(self.points[:,2] / self.h_res,dtype='int')
-            out = x * 0
-            for xx in [z,y,x]:
+    def set_pts_morton_id(self, center):
+            self.idx = np.asarray(self.points[:,0] / self.resolution,dtype='int')
+            self.idy = np.asarray(self.points[:,1] / self.resolution,dtype='int')
+            self.idz = np.asarray(self.points[:,2] / self.h_res,dtype='int')
+
+            cidx, cidy, cidz = (center / [self.resolution, self.resolution, self.h_res]).astype(int)
+            half_of_dim = self.dim_2d//2
+            tmp  = np.where((self.idx < cidx + half_of_dim) * (self.idx > cidx - half_of_dim) * (self.idy < cidy + half_of_dim) * (self.idy > cidy - half_of_dim), 1, 0)
+            self.idx = self.idx[np.where(tmp != 0)]
+            self.idy = self.idy[np.where(tmp != 0)]
+            self.idz = self.idz[np.where(tmp != 0)]
+            self.points = self.points[np.where(tmp != 0)]
+            out = self.idx * 0
+
+            for xx in [self.idz,self.idy,self.idx]:
                 xx = (xx | (xx << 16)) & 0x030000FF
                 xx = (xx | (xx <<  8)) & 0x0300F00F
                 xx = (xx | (xx <<  4)) & 0x030C30C3
                 xx = (xx | (xx <<  2)) & 0x09249249
                 out |= xx
                 out << 1
+
             self.points_with_id = np.c_[self.points, out]
             self.points_with_id = self.points_with_id[np.argsort(self.points_with_id[:,3], ),:]
-            print(self.points_with_id[:,3])
 
-    def get_gid_from_morton_id(self, input):
+    def get_xyz_from_morton_id(self, input):
         x = input &        0x09249249
         y = (input >> 1) & 0x09249249
         z = (input >> 2) & 0x09249249
@@ -228,7 +238,33 @@ class Points:
         z = ((z >> 8) | z) & 0x030000FF
         z = ((z >>16) | z) & 0x000003FF
 
-        return [x,y,z]
+        return x,y,z
+
+    def from_morton_to_2d_binary(self, center):
+        '''
+        output: 2d dict but save the points' index in the 2d grid.
+        '''
+
+        self.M_2d = np.zeros((self.dim_2d, self.dim_2d))
+        self.N_2d = np.zeros((self.dim_2d, self.dim_2d))
+        
+        cidx, cidy, cidz = (center / [self.resolution, self.resolution, self.h_res]).astype(int)
+        self.idx_c = self.idx - cidx + self.dim_2d//2
+        self.idy_c = self.idy - cidy + self.dim_2d//2
+        self.idz_c = self.idz - cidz + self.dim_2d//2
+
+        for i in range(len(self.points)):
+            if self.idx_c[i] < self.dim_2d and self.idy_c[i]<self.dim_2d and self.idy_c[i]>=0 and self.idx_c[i]>=0:
+                self.M_2d[self.idx_c[i]][self.idy_c[i]] = 1
+                self.N_2d[self.idx_c[i]][self.idy_c[i]] += 1
+                # 500.167847 ms -> 643.996239 ms
+                self.twoD2ptindex[self.idx_c[i]][self.idy_c[i]].append(i)
+                # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
+                if not(self.idz_c[i]>62 or self.idz_c[i]<0):
+                    self.binary_2d[self.idx_c[i]][self.idy_c[i]] = self.binary_2d[self.idx_c[i]][self.idy_c[i]] | (1<<(self.idz_c[i]).astype(int))
+        TOC("Stack to binary 2D")
+
+
 
     @staticmethod
     def view_compare(inlier, outlier, others=None, view_file = None):
