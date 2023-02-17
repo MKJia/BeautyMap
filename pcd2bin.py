@@ -72,16 +72,6 @@ def main():
     ## Generate csv meta file
     csv_file_path = os.path.join(args.bin_path, "meta.csv")
     csv_file = open(csv_file_path, "w")
-    meta_file = csv.writer(
-        csv_file, delimiter=",", quotechar="|", quoting=csv.QUOTE_MINIMAL
-    )
-    ## Write csv meta file header
-    meta_file.writerow(
-        [
-            "pcd file name",
-            "bin file name",
-        ]
-    )
     print("Finish to generate csv meta file")
 
     ## Converting Process
@@ -115,13 +105,7 @@ def main():
 
         ## Save bin file                                    
         points_32.tofile(bin_file_path)
-
-        ## Write csv meta file
-        meta_file.writerow(
-            [os.path.split(pcd_file)[-1], bin_file_name]
-        )
-
         seq = seq + 1
-    
+    print("finished convert: \n", pcd_files)
 if __name__ == "__main__":
     main()

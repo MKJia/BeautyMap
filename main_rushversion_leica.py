@@ -28,7 +28,7 @@ TIC()
 points_index2Remove = []
 Mpts = Points("data/bin/KTH_1A2.bin", RANGE, RESOLUTION)
 
-for id_ in range(1,4):
+for id_ in range(1,3):
     Mpts.clear_result(id_)
     Qpts = Points(f"data/bin/KTH_00{id_}.bin", RANGE, RESOLUTION)
 

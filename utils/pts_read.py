@@ -21,12 +21,13 @@ sys.path.append(BASE_DIR)
 from utils.global_def import *
 
 from collections import defaultdict
+import time
 class Points:
     def __init__(self, file, range_m, resolution, h_res=0.5):
         ## 0. Read Point Cloud
-        TIC()
+        st = time.time()
         self.points = np.fromfile(file, dtype=np.float32).reshape(-1, 4)
-        TOC("Numpy read pt")
+        print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("Numpy read pt", ((time.time() - st))*1000))
 
         # parameters
         self.range_m = range_m * 2 # since range is half of dis
@@ -66,13 +67,14 @@ class Points:
 
     def GlobalMap_to_2d_binary(self, center=np.array([0,0,0])):
         '''
-        output: 2d dict but save the points' index in the 2d grid.
+        NOTE: Here is only for global map to 2d binary once. NO need in the loop function anymore.
         '''
+        st = time.time()
         self.global_center = center
         self.points = self.points[:,:3] - self.global_center
         ## 1. save max min for range, refresh the range based on max and min
         self.max_xyz = np.array([max(abs(self.points[...,0])), max(abs(self.points[...,1])), max(abs(self.points[...,2]))])
-        # self.min_xyz = np.array([min(abs(self.points[...,0])), min(abs(self.points[...,1])), min(self.points[...,2])])
+
         self.range_m = max(self.max_xyz[0], self.max_xyz[1]) * 2
         self.dim_2d = (int)(self.range_m/self.resolution)
 
@@ -80,34 +82,73 @@ class Points:
         self.binary_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
 
         ## 2. Voxelize STACK TO 2D
-        idxy = (np.divide(self.points,self.resolution) + (self.range_m/self.resolution)/2).astype(int)
+        idxy = (np.divide(self.points[...,:2],self.resolution) + (self.range_m/self.resolution)/2).astype(int)
         # HARD CODE HERE!! + 5
         self.idz = (np.divide(self.points[...,2], self.h_res)).astype(int) + 5
 
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
-            if self.idx[i] < self.dim_2d and self.idy[i]<self.dim_2d and self.idy[i]>=0 and self.idx[i]>=0:
-                self.M_2d[self.idx[i]][self.idy[i]] = 1
+            idx = ptidxy[0]
+            idy = ptidxy[1]
+            if idx < self.dim_2d and idy<self.dim_2d and idx>=0 and idy>=0:
+                self.M_2d[idx][idy] = 1
                 # 500.167847 ms -> 643.996239 ms
-                self.twoD2ptindex[self.idx[i]][self.idy[i]].append(i)
+                self.twoD2ptindex[idx][idy].append(i)
                 # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
                 if not(self.idz[i]>62 or self.idz[i]<0):
-                    self.binary_2d[self.idx[i]][self.idy[i]] = self.binary_2d[self.idx[i]][self.idy[i]] | (1<<(self.idz[i]).astype(int))
-        TOC("Global Map Stack to 2D")
+                    self.binary_2d[idx][idy] = self.binary_2d[idx][idy] | (1<<(self.idz[i]).astype(int))
+        print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("Global Map Stack to 2D", ((time.time() - st))*1000))
 
     def SelectMap_based_on_Query_center(self, q_dim, center=np.array([0,0,0])):
         '''
         input: q_dim means query frame dimension, it should be different value
         output: 2d dict but save the points' index in the 2d grid.
         '''
+        st = time.time()
         self.center_xy_id =(np.divide(center - self.global_center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)[:2]
+        
+        # se means start and end
+        gidx_se = [self.center_xy_id[0]-q_dim//2, self.center_xy_id[0]+q_dim//2]
+        gidy_se = [self.center_xy_id[1]-q_dim//2, self.center_xy_id[1]+q_dim//2]
+        
+        self.gid_max = self.binary_2d.shape[0]
         # bqc: based on Query center, maybe BUG HERE need padding if exceed the max range
+        # FIX: with larger the range twice than normal, check [self.range_m = self.range_m * 2]
         self.bqc_binary_2d = np.zeros((q_dim, q_dim), dtype=int)
-        self.bqc_binary_2d = self.binary_2d[
-        (self.center_xy_id[0]-q_dim//2):(self.center_xy_id[0]+q_dim//2),
-        (self.center_xy_id[1]-q_dim//2):(self.center_xy_id[1]+q_dim//2)
-        ]
-        TOC("Select QRoI")
+        
+        gidx_min, gidy_min = max(0, gidx_se[0]), max(0, gidy_se[0])
+        gidx_max, gidy_max = min(self.gid_max, gidx_se[1]), min(self.gid_max, gidy_se[1])
+        delta_x = gidx_max-gidx_min
+        delta_y = gidy_max-gidy_min
+        extract_roi = self.binary_2d[gidx_min:gidx_max, gidy_min:gidy_max]
+        if delta_x==q_dim and delta_y==q_dim:
+            self.bqc_binary_2d = extract_roi
+        elif delta_x < q_dim and delta_y==q_dim:
+            if gidx_se[0] > self.gid_max:
+                self.bqc_binary_2d[0:delta_x, :] = extract_roi
+            else:
+                mid_start = q_dim-delta_x
+                self.bqc_binary_2d[mid_start:q_dim, :] = extract_roi
+        elif delta_x==q_dim and delta_y < q_dim:
+            if gidy_se[0] > self.gid_max:
+                self.bqc_binary_2d[:, 0:delta_y] = extract_roi
+            else:
+                mid_start = q_dim-delta_y
+                self.bqc_binary_2d[:, mid_start:q_dim] = extract_roi
+        else:
+            print(f"{bc.FAIL} invalid judge Check code here{bc.ENDC}")
+            exit
+        print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("Select QRoI", ((time.time() - st))*1000))
+
+    def search_query_index2Map(self, i,j, q_dim):
+        # 最好再次check 特殊脚边的情况
+        Mi = i + self.center_xy_id[0] - q_dim//2
+        Mj = j + self.center_xy_id[1] - q_dim//2
+        if Mi<0 or Mj<0 or Mi>self.gid_max or Mj>self.gid_max:
+            print(f"{bc.FAIL} Index invalid, please make sure Trigger `& Mpts.bqc_binary_2d`!! {bc.ENDC}")
+            sys.exit()
+        else:
+            return Mi, Mj
 
     def from_center_to_2d_grid(self, center=np.array([0,0,0])):
         '''
@@ -139,14 +180,14 @@ class Points:
         
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
-            if self.idx[i] < self.dim_2d and self.idy[i]<self.dim_2d and self.idy[i]>=0 and self.idx[i]>=0:
-                self.M_2d[self.idx[i]][self.idy[i]] = 1
-                self.N_2d[self.idx[i]][self.idy[i]] += 1
+            if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>=0 and ptidxy[0]>=0:
+                self.M_2d[ptidxy[0]][ptidxy[1]] = 1
+                self.N_2d[ptidxy[0]][ptidxy[1]] += 1
                 # 500.167847 ms -> 643.996239 ms
-                self.twoD2ptindex[self.idx[i]][self.idy[i]].append(i)
+                self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
                 # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
                 if not(self.idz[i]>62 or self.idz[i]<0):
-                    self.binary_2d[self.idx[i]][self.idy[i]] = self.binary_2d[self.idx[i]][self.idy[i]] | (1<<(self.idz[i]).astype(int))
+                    self.binary_2d[ptidxy[0]][ptidxy[1]] = self.binary_2d[ptidxy[0]][ptidxy[1]] | (1<<(self.idz[i]).astype(int))
         TOC("Stack to binary 2D")
 
     def select_data_from_2DptIndex(self, i, j):
