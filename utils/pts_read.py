@@ -34,6 +34,9 @@ class Points:
         self.resolution = resolution
         self.dim_2d = (int)(self.range_m/resolution)
         self.h_res = h_res
+        
+        # 为了使得 传感器相对位置下的 z 能被计入计算 HARD CODE HERE
+        self.idz_offset = 2
 
         # results
         self.twoD2ptindex = defaultdict(lambda  : defaultdict(list))
@@ -83,8 +86,7 @@ class Points:
 
         ## 2. Voxelize STACK TO 2D
         idxy = (np.divide(self.points[...,:2],self.resolution) + (self.range_m/self.resolution)/2).astype(int)
-        # HARD CODE HERE!! + 5
-        self.idz = (np.divide(self.points[...,2], self.h_res)).astype(int) + 5
+        self.idz = (np.divide(self.points[...,2], self.h_res)).astype(int) + self.idz_offset
 
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
@@ -173,8 +175,7 @@ class Points:
         '''
         ## 2. Voxelize STACK TO 2D
         idxy = (np.divide(self.points - center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)
-        # HARD CODE HERE!! + 5
-        self.idz = (np.divide(self.points[...,2] - center[2], self.h_res)).astype(int) + 5
+        self.idz = (np.divide(self.points[...,2] - center[2], self.h_res)).astype(int) + self.idz_offset
         self.M_2d = np.zeros((self.dim_2d, self.dim_2d))
         self.N_2d = np.zeros((self.dim_2d, self.dim_2d))
         

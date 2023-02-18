@@ -28,7 +28,7 @@ TIC()
 points_index2Remove = []
 Mpts = Points("data/bin/KTH_1A2.bin", RANGE, RESOLUTION)
 
-for id_ in range(1,3):
+for id_ in range(1,2):
     Mpts.clear_result(id_)
     Qpts = Points(f"data/bin/KTH_00{id_}.bin", RANGE, RESOLUTION)
 
@@ -65,8 +65,8 @@ for id_ in range(1,3):
     axs[0,1].set_title('Prior Map bin 2d')
     axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
     axs[1,0].set_title('After RPG')
-    axs[1,1].imshow(Qpts.RangeMask, cmap='hot', interpolation='nearest')
-    axs[1,1].set_title('After RPG Mask')
+    axs[1,1].imshow(np.log(Mpts.binary_2d), cmap='hot', interpolation='nearest')
+    axs[1,1].set_title('Select Map')
     plt.show()
 
     for (i,j) in tqdm(list(zip(*np.where(trigger != 0))), desc=f"frame id {id_}: grids traverse"):
