@@ -9,6 +9,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
+from tqdm import tqdm
 
 # vis
 import open3d as o3d
@@ -30,14 +31,18 @@ points_index2Remove = []
 # 0. read Data =====>
 Mpts = Points("data/bin/TPB_global_map.bin", RANGE, RESOLUTION)
 df = pd.read_csv('data/TPB_poses_lidar2body.csv')
+all_center_pose = np.array(df.values[:,2:], dtype=float)
+mean_center = np.mean(all_center_pose[:,:3], axis=0)
 # 0. read Data =====>
-mean_center_height = np.mean(df.values[:,3])
-print(f"According to the pose file, the mean height of the sensor pose is: {mean_center_height:.2f}\nPlease make sure it's correct one.")
-Mpts.GlobalMap_to_2d_binary(center=np.array([0,0, mean_center_height]))
 
-for id_ in range(100,101):
+print(f"According to the pose file, the mean center is: {np.round(mean_center,2)}")
+print("Please make sure it's correct one.")
 
-    pose = df.values[id_][2:]
+Mpts.GlobalMap_to_2d_binary(center=mean_center)
+
+for id_ in range(96,101):
+
+    pose = all_center_pose[id_]
     wxyz = np.array([pose[6],pose[3],pose[4],pose[5]])
     T_Q = np.eye(4)
     T_Q[:3,:3] = quat2mat(wxyz)
@@ -48,11 +53,12 @@ for id_ in range(100,101):
     center = Qpts.points[0,:]
     print("point center is ", center)
 
-    Mpts.SelectMap_based_on_Query_center(Qpts.dim_2d, center)
-    # since the height should be the same one reference
-    center[2] = mean_center_height
-    Qpts.from_center_to_2d_binary(center)
+    [min_i_map, max_i_map], [min_j_map, max_j_map] = \
+        Qpts.build_2d_binary_M_ref_select_roi(Mpts.range_m, Mpts.dim_2d,
+        center=Mpts.global_center, pose_center=center)
 
+    Mpts.SelectMap_based_on_Query_center(min_i_map, max_i_map, min_j_map, max_j_map)
+    
     # pre-process
 
     # RPG
@@ -84,9 +90,11 @@ for id_ in range(100,101):
     plt.show()
 
     stt = time.time()
-    for (i,j) in list(zip(*np.where(trigger != 0))):
-        i_in_Map, j_in_Map = Mpts.search_query_index2Map(i, j, Qpts.dim_2d)
-        for k in Mpts.twoD2ptindex[i_in_Map][j_in_Map]:
+    for (i,j) in tqdm(list(zip(*np.where(trigger != 0))), desc=f"frame id {id_}: grids traverse"):
+        max_obj_length = trigger[i][j] & (trigger[i][j]<<5)
+        if max_obj_length != 0:
+            trigger[i][j] = trigger[i][j] & (~max_obj_length)& (~max_obj_length>>1)& (~max_obj_length>>2)& (~max_obj_length>>3)& (~max_obj_length>>4)& (~max_obj_length>>5)
+        for k in Mpts.twoD2ptindex[i+min_i_map][j+min_j_map]:
             if_delete = trigger[i][j] & (1<<Mpts.idz[k] if not(Mpts.idz[k]>62 or Mpts.idz[k]<0) else 0)
             if if_delete!=0:
                 points_index2Remove = points_index2Remove + [k]

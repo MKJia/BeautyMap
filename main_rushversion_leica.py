@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
 from tqdm import tqdm
+
 # vis
 import open3d as o3d
 o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
@@ -29,23 +30,31 @@ points_index2Remove = []
 # 0. read Data =====>
 Mpts = Points("data/bin/KTH_1A2.bin", RANGE, RESOLUTION)
 df = pd.read_csv('data/kth_scan_poses.csv')
-offset = np.array([-154100.0, -6581400.0, 0])
+all_center_pose = np.array(df.values[:,1:4], dtype=float)
+mean_center = np.mean(all_center_pose, axis=0)
+
+offset = np.array([-154100.0, -6581400.0, 0.0])
+all_center_pose = all_center_pose + offset
+mean_center = mean_center + offset
+
 # 0. read Data =====>
-mean_center_height = np.mean(df.values[:,3])
-print(f"According to the pose file, the mean height of the sensor pose is: {mean_center_height:.2f}\nPlease make sure it's correct one.")
-Mpts.GlobalMap_to_2d_binary(center=np.array([0,0, mean_center_height]))
+print(f"According to the pose file, the mean center is: {np.round(mean_center,2)}")
+print("Please make sure it's correct one.")
 
-for id_ in range(1,2):
-    Qpts = Points(f"data/bin/KTH_00{id_}.bin", RANGE, RESOLUTION)
+Mpts.GlobalMap_to_2d_binary(center=mean_center)
 
-    center = np.array(df.values[id_-1][1:4], dtype=float) + offset
-    center[2] = mean_center_height # since the height should be the same one reference
-    print("point center is ", center)
+for id_ in range(1,3):
+    # should be the same resolution with Map
+    Qpts = Points(f"data/bin/KTH_00{id_}.bin", RANGE, Mpts.resolution)
 
-    Mpts.SelectMap_based_on_Query_center(Qpts.dim_2d, center)
-    Qpts.from_center_to_2d_binary(center)
+    # select the small range
+    center = np.array(all_center_pose[id_ - 1], dtype=float)
 
-    # Qpts.build_2d_binary_with_M_range(Mpts.range_m, center=np.array([0,0, mean_center_height]))
+    [min_i_map, max_i_map], [min_j_map, max_j_map] = \
+        Qpts.build_2d_binary_M_ref_select_roi(Mpts.range_m, Mpts.dim_2d,
+        center=Mpts.global_center, pose_center=center)
+
+    Mpts.SelectMap_based_on_Query_center(min_i_map, max_i_map, min_j_map, max_j_map)
 
     # pre-process
 
@@ -57,7 +66,7 @@ for id_ in range(1,2):
     Qpts.RangeMask = Qpts.generate_range_mask(int(RANGE_LEICA/RESOLUTION))
 
     binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.bqc_binary_2d)
-    trigger = (~Qpts.binary_2d) & binary_xor & Mpts.bqc_binary_2d
+    trigger = (~Qpts.binary_2d) & binary_xor
 
     trigger &= ~(Qpts.RPGMask - 1)
     trigger &= ~(Qpts.RangeMask - 1)
@@ -74,22 +83,21 @@ for id_ in range(1,2):
     axs[1,1].set_title('Trigger Map')
     plt.show()
 
-    # stt = time.time()
-    # for (i,j) in tqdm(list(zip(*np.where(trigger != 0))), desc=f"frame id {id_}: grids traverse"):
-    #     max_obj_length = trigger[i][j] & (trigger[i][j]<<5)
-    #     if max_obj_length != 0:
-    #         trigger[i][j] = trigger[i][j] & (~max_obj_length)& (~max_obj_length>>1)& (~max_obj_length>>2)& (~max_obj_length>>3)& (~max_obj_length>>4)& (~max_obj_length>>5)
-    #     i_in_Map, j_in_Map = Mpts.search_query_index2Map(i, j, Qpts.dim_2d)
-    #     for k in Mpts.twoD2ptindex[i_in_Map][j_in_Map]:
-    #         if_delete = trigger[i][j] & (1<<Mpts.idz[k] if not(Mpts.idz[k]>62 or Mpts.idz[k]<0) else 0)
-    #         if if_delete!=0:
-    #             points_index2Remove = points_index2Remove + [k]
-    # print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("grid index 2 pts", ((time.time() - stt))*1000))
+    stt = time.time()
+    for (i,j) in tqdm(list(zip(*np.where(trigger != 0))), desc=f"frame id {id_}: grids traverse"):
+        max_obj_length = trigger[i][j] & (trigger[i][j]<<5)
+        if max_obj_length != 0:
+            trigger[i][j] = trigger[i][j] & (~max_obj_length)& (~max_obj_length>>1)& (~max_obj_length>>2)& (~max_obj_length>>3)& (~max_obj_length>>4)& (~max_obj_length>>5)
+        for k in Mpts.twoD2ptindex[i+min_i_map][j+min_j_map]:
+            if_delete = trigger[i][j] & (1<<Mpts.idz[k] if not(Mpts.idz[k]>62 or Mpts.idz[k]<0) else 0)
+            if if_delete!=0:
+                points_index2Remove = points_index2Remove + [k]
+    print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("grid index 2 pts", ((time.time() - stt))*1000))
 print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("All processes", ((time.time() - st))*1000))
 
-# print(f"There are {len(points_index2Remove)} pts to remove")
-# inlier_cloud = Mpts.select_by_index(points_index2Remove)
-# oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True)
-# Mpts.view_compare(inlier_cloud, oulier_cloud)
+print(f"There are {len(points_index2Remove)} pts to remove")
+inlier_cloud = Mpts.select_by_index(points_index2Remove)
+oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True)
+Mpts.view_compare(inlier_cloud, oulier_cloud)
 
 print(f"{os.path.basename( __file__ )}: All codes run successfully, Close now..")
