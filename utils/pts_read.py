@@ -49,15 +49,6 @@ class Points:
         self.o3d_pts.points = o3d.utility.Vector3dVector(self.points[:,:3])
         self.points = np.asarray(self.o3d_pts.points)
 
-    def clear_result(self, id=0):
-        print(f"Clear result =============> id: {id} ===============>")
-        # results
-        self.twoD2ptindex = defaultdict(lambda  : defaultdict(list))
-        self.gmmFitMatrix = defaultdict(lambda  : defaultdict(list))
-        self.bin_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
-        self.binary_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
-        self.points = np.asarray(self.o3d_pts.points)
-
     def transform_from_TF_Matrix(self, T_MATRIX=np.eye(4)):
         self.points = np.insert(self.points, 0, np.array([0,0,0]),axis=0)
         self.o3d_pts.points = o3d.utility.Vector3dVector(self.points[:,:3])
@@ -107,15 +98,14 @@ class Points:
         output: 2d dict but save the points' index in the 2d grid.
         '''
         st = time.time()
-        self.center_xy_id =(np.divide(center - self.global_center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)[:2]
+        tmp = np.divide(center - self.global_center,self.resolution) + (self.range_m/self.resolution)/2
+        self.center_xy_id = (np.ceil(tmp)[:2]).astype(int)
         
         # se means start and end
         gidx_se = [self.center_xy_id[0]-q_dim//2, self.center_xy_id[0]+q_dim//2]
         gidy_se = [self.center_xy_id[1]-q_dim//2, self.center_xy_id[1]+q_dim//2]
         
         self.gid_max = self.binary_2d.shape[0]
-        # bqc: based on Query center, maybe BUG HERE need padding if exceed the max range
-        # FIX: with larger the range twice than normal, check [self.range_m = self.range_m * 2]
         self.bqc_binary_2d = np.zeros((q_dim, q_dim), dtype=int)
         
         gidx_min, gidy_min = max(0, gidx_se[0]), max(0, gidy_se[0])
@@ -139,7 +129,7 @@ class Points:
                 self.bqc_binary_2d[:, mid_start:q_dim] = extract_roi
         else:
             print(f"{bc.FAIL} invalid judge Check code here{bc.ENDC}")
-            exit
+            sys.exit()
         print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("Select QRoI", ((time.time() - st))*1000))
 
     def search_query_index2Map(self, i,j, q_dim):
@@ -151,28 +141,37 @@ class Points:
             sys.exit()
         else:
             return Mi, Mj
-
-    def from_center_to_2d_grid(self, center=np.array([0,0,0])):
+    def build_2d_binary_with_M_range(self, range_m, center = np.array([0,0,0])):
         '''
         output: 2d dict but save the points' index in the 2d grid.
         '''
+        st = time.time()
         ## 2. Voxelize STACK TO 2D
-        idxy = (np.divide(self.points - center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)
-
+        self.dim_2d = int(range_m/self.resolution)
+        idxy = (np.divide(self.points - center,self.resolution) + (self.dim_2d)/2).astype(int)
+        self.idz = (np.divide(self.points[...,2] - center[2], self.h_res)).astype(int) + self.idz_offset
+        
         self.M_2d = np.zeros((self.dim_2d, self.dim_2d))
+        self.N_2d = np.zeros((self.dim_2d, self.dim_2d))
+        self.binary_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
         
         self.pts1idxy = []
         for i, ptidxy in enumerate(idxy):
-            if self.idx[i] < self.dim_2d and self.idy[i]<self.dim_2d and self.idy[i]>=0 and self.idx[i]>=0:
-                self.M_2d[self.idx[i]][self.idy[i]] = 1
+            if ptidxy[0] < self.dim_2d and ptidxy[1]<self.dim_2d and ptidxy[1]>=0 and ptidxy[0]>=0:
+                self.M_2d[ptidxy[0]][ptidxy[1]] = 1
+                self.N_2d[ptidxy[0]][ptidxy[1]] += 1
                 # 500.167847 ms -> 643.996239 ms
-                self.twoD2ptindex[self.idx[i]][self.idy[i]].append(i)
-        TOC("Stack to 2D grid")
+                self.twoD2ptindex[ptidxy[0]][ptidxy[1]].append(i)
+                # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
+                if not(self.idz[i]>62 or self.idz[i]<0):
+                    self.binary_2d[ptidxy[0]][ptidxy[1]] = self.binary_2d[ptidxy[0]][ptidxy[1]] | (1<<(self.idz[i]).astype(int))
+        print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("Stack to 2D", ((time.time() - st))*1000))
 
     def from_center_to_2d_binary(self, center=np.array([0,0,0])):
         '''
         output: 2d dict but save the points' index in the 2d grid.
         '''
+        st = time.time()
         ## 2. Voxelize STACK TO 2D
         idxy = (np.divide(self.points - center,self.resolution) + (self.range_m/self.resolution)/2).astype(int)
         self.idz = (np.divide(self.points[...,2] - center[2], self.h_res)).astype(int) + self.idz_offset
@@ -189,7 +188,7 @@ class Points:
                 # Give the bin based on the z axis, e.g. idz = 10 1<<10 to point out there is occupied
                 if not(self.idz[i]>62 or self.idz[i]<0):
                     self.binary_2d[ptidxy[0]][ptidxy[1]] = self.binary_2d[ptidxy[0]][ptidxy[1]] | (1<<(self.idz[i]).astype(int))
-        TOC("Stack to binary 2D")
+        print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("Stack to 2D", ((time.time() - st))*1000))
 
     def select_data_from_2DptIndex(self, i, j):
         return self.points[self.twoD2ptindex[i][j]]
