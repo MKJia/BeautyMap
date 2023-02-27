@@ -69,11 +69,6 @@ def main():
             print ("Failed to create directory!!!!!")
             raise
 
-    ## Generate csv meta file
-    csv_file_path = os.path.join(args.bin_path, "meta.csv")
-    csv_file = open(csv_file_path, "w")
-    print("Finish to generate csv meta file")
-
     ## Converting Process
     print("Converting Start!")
     seq = 0

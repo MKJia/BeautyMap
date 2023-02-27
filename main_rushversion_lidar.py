@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
 from tqdm import tqdm
+import operator
+from itertools import chain
 
 # vis
 import open3d as o3d
@@ -78,16 +80,16 @@ for id_ in range(96,101):
     trigger &= ~(Qpts.RPGMask - 1)
     trigger &= ~(Qpts.RangeMask - 1)
 
-    fig, axs = plt.subplots(2, 2, figsize=(8,8))
-    axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
-    axs[0,0].set_title('Query 2d')
-    axs[0,1].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
-    axs[0,1].set_title('Prior Map bin 2d')
-    axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
-    axs[1,0].set_title('After RPG')
-    axs[1,1].imshow(Qpts.RangeMask, cmap='hot', interpolation='nearest')
-    axs[1,1].set_title('After RPG Mask')
-    plt.show()
+    # fig, axs = plt.subplots(2, 2, figsize=(8,8))
+    # axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
+    # axs[0,0].set_title('Query 2d')
+    # axs[0,1].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
+    # axs[0,1].set_title('Prior Map bin 2d')
+    # axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
+    # axs[1,0].set_title('After RPG')
+    # axs[1,1].imshow(Qpts.RangeMask, cmap='hot', interpolation='nearest')
+    # axs[1,1].set_title('After RPG Mask')
+    # plt.show()
 
     stt = time.time()
     for (i,j) in tqdm(list(zip(*np.where(trigger != 0))), desc=f"frame id {id_}: grids traverse"):
@@ -98,22 +100,18 @@ for id_ in range(96,101):
         #     if_delete = trigger[i][j] & (1<<Mpts.idz[k] if not(Mpts.idz[k]>62 or Mpts.idz[k]<0) else 0)
         #     if if_delete!=0:
         #         points_index2Remove = points_index2Remove + [k]
-        t = trigger[i][j]
-        tmp = []
-        cnt = 0
-        while t:
-            if t & 1 == 1:
-                tmp.append(cnt)
-            t = t >> 1
-            cnt += 1
-        for i in tmp:
-            points_index2Remove += Mpts.threeD2ptindex[i+min_i_map][j+min_j_map][i]
+        all3d_indexs = Mpts.binTo3id(trigger[i][j])
+        if (len(all3d_indexs)==0):
+            continue
+        elif(len(all3d_indexs)==1):
+            points_index2Remove += Mpts.threeD2ptindex[i+min_i_map][j+min_j_map][all3d_indexs[0]]
+        else:
+            points_index2Remove += list(chain(*operator.itemgetter(*all3d_indexs)(Mpts.threeD2ptindex[i+min_i_map][j+min_j_map])))
+
     print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("grid index 2 pts", ((time.time() - stt))*1000))
 print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("All processes", ((time.time() - st))*1000))
 
-print(f"There are {len(points_index2Remove)} pts to remove")
-TOC("All processes")
-
+print(f"\nThere are {len(points_index2Remove)} pts to remove")
 inlier_cloud = Mpts.select_by_index(points_index2Remove)
 oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True)
 Mpts.view_compare(inlier_cloud, oulier_cloud)

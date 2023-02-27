@@ -406,3 +406,14 @@ class Points:
     @staticmethod
     def view(pts):
         o3d.visualization.draw_geometries([pts])
+
+    @staticmethod
+    def binTo3id(t):
+        tmp = []
+        cnt = 0
+        while t:
+            if t & 1 == 1:
+                tmp.append(cnt)
+            t = t >> 1
+            cnt += 1
+        return tmp

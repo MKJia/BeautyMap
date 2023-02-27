@@ -29,13 +29,9 @@ points_index2Remove = []
 
 # 0. read Data =====>
 Mpts = Points("data/bin/KTH_1A2.bin", RANGE, RESOLUTION)
-df = pd.read_csv('data/kth_scan_poses.csv')
-all_center_pose = np.array(df.values[:,1:4], dtype=float)
-mean_center = np.mean(all_center_pose, axis=0)
-
-offset = np.array([-154100.0, -6581400.0, 0.0])
-all_center_pose = all_center_pose + offset
-mean_center = mean_center + offset
+df = pd.read_csv('data/KTH_poses_sensor.csv')
+all_center_pose = np.array(df.values[:,2:], dtype=float)
+mean_center = np.mean(all_center_pose[:,:3], axis=0)
 
 # 0. read Data =====>
 print(f"According to the pose file, the mean center is: {np.round(mean_center,2)}")
@@ -48,7 +44,7 @@ for id_ in range(1,3):
     Qpts = Points(f"data/bin/KTH_00{id_}.bin", RANGE, Mpts.resolution)
 
     # select the small range
-    center = np.array(all_center_pose[id_ - 1], dtype=float)
+    center = all_center_pose[id_]
 
     [min_i_map, max_i_map], [min_j_map, max_j_map] = \
         Qpts.build_2d_binary_M_ref_select_roi(Mpts.range_m, Mpts.dim_2d,
