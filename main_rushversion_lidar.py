@@ -38,7 +38,7 @@ mean_center = np.mean(all_center_pose[:,:3], axis=0)
 print(f"According to the pose file, the mean center is: {np.round(mean_center,2)}")
 print("Please make sure it's correct one.")
 
-Mpts.GlobalMap_to_2d_binary(center=mean_center)
+Mpts.Generate_mat_tree(center=mean_center)
 
 for id_ in range(96,101):
 
@@ -54,7 +54,7 @@ for id_ in range(96,101):
     print("point center is ", center)
 
     [min_i_map, max_i_map], [min_j_map, max_j_map] = \
-        Qpts.build_2d_binary_M_ref_select_roi(Mpts.range_m, Mpts.dim_2d,
+        Qpts.build_query_mat_tree_ref_select_roi(Mpts.range_m, Mpts.dim_2d,
         center=Mpts.global_center, pose_center=center)
 
     Mpts.SelectMap_based_on_Query_center(min_i_map, max_i_map, min_j_map, max_j_map)
@@ -73,7 +73,7 @@ for id_ in range(96,101):
     binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.bqc_binary_2d)
     trigger = (~Qpts.binary_2d) & binary_xor & Mpts.bqc_binary_2d
 
-    trigger = trigger & (trigger - 1) # for h_res = 0.5
+    # trigger = trigger & (trigger - 1) # for h_res = 0.5
     # trigger = trigger & (trigger - 1)
     trigger &= ~(Qpts.RPGMask - 1)
     trigger &= ~(Qpts.RangeMask - 1)
@@ -94,10 +94,20 @@ for id_ in range(96,101):
         max_obj_length = trigger[i][j] & (trigger[i][j]<<5)
         if max_obj_length != 0:
             trigger[i][j] = trigger[i][j] & (~max_obj_length)& (~max_obj_length>>1)& (~max_obj_length>>2)& (~max_obj_length>>3)& (~max_obj_length>>4)& (~max_obj_length>>5)
-        for k in Mpts.twoD2ptindex[i+min_i_map][j+min_j_map]:
-            if_delete = trigger[i][j] & (1<<Mpts.idz[k] if not(Mpts.idz[k]>62 or Mpts.idz[k]<0) else 0)
-            if if_delete!=0:
-                points_index2Remove = points_index2Remove + [k]
+        # for k in Mpts.twoD2ptindex[i+min_i_map][j+min_j_map]:
+        #     if_delete = trigger[i][j] & (1<<Mpts.idz[k] if not(Mpts.idz[k]>62 or Mpts.idz[k]<0) else 0)
+        #     if if_delete!=0:
+        #         points_index2Remove = points_index2Remove + [k]
+        t = trigger[i][j]
+        tmp = []
+        cnt = 0
+        while t:
+            if t & 1 == 1:
+                tmp.append(cnt)
+            t = t >> 1
+            cnt += 1
+        for i in tmp:
+            points_index2Remove += Mpts.threeD2ptindex[i+min_i_map][j+min_j_map][i]
     print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("grid index 2 pts", ((time.time() - stt))*1000))
 print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("All processes", ((time.time() - st))*1000))
 
