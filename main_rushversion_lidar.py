@@ -11,7 +11,6 @@ import pandas as pd
 from sklearn.mixture import GaussianMixture
 from tqdm import tqdm
 import operator
-from itertools import chain
 
 # vis
 import open3d as o3d
@@ -106,7 +105,8 @@ for id_ in range(96,101):
         elif(len(all3d_indexs)==1):
             points_index2Remove += Mpts.threeD2ptindex[i+min_i_map][j+min_j_map][all3d_indexs[0]]
         else:
-            points_index2Remove += list(chain(*operator.itemgetter(*all3d_indexs)(Mpts.threeD2ptindex[i+min_i_map][j+min_j_map])))
+            tupleOfTuples = operator.itemgetter(*all3d_indexs)(Mpts.threeD2ptindex[i+min_i_map][j+min_j_map])
+            points_index2Remove += [element for tupl in tupleOfTuples for element in tupl]
 
     print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("grid index 2 pts", ((time.time() - stt))*1000))
 print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("All processes", ((time.time() - st))*1000))
