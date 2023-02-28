@@ -439,7 +439,7 @@ class Points:
                     binary_2d[idx][idy] = binary_2d[idx][idy] | (1<<adaptive_idz[i])
         T.binary_2d = binary_2d[min_i_map:max_i_map, min_j_map:max_j_map]
 
-        ## 2. Voxelize Map ROI STACK TO 2D self
+        ## 3. Voxelize Map ROI STACK TO 2D self
         idxy = (np.divide(np.asarray(self.LOGICPts)[...,:2],self.resolution/2)).astype(int) + self.dim_2d//2
         idz = (np.divide(np.asarray(self.LOGICPts)[...,2], max(0.05, self.h_res / LOGIC_BIT_UB))).astype(int)
         adaptive_idz = (np.divide(np.asarray(self.LOGICPts)[...,2], self.h_res)).astype(int) # just initalize

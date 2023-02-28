@@ -28,6 +28,7 @@ RANGE_16_RING = 8
 
 st = time.time()
 points_index2Remove = []
+points_index2Remove_in_ROI = []
 
 # 0. read Data =====>
 Mpts = Points("data/bin/TPB_global_map.bin", RANGE, RESOLUTION)
@@ -77,7 +78,6 @@ for id_ in range(96,101):
     Mpts_ROI.o3d_pts = Mpts.o3d_pts
     Mpts_ROI.LOGICMat = (0b11 * (Mpts.bqc_binary_2d & -Mpts.bqc_binary_2d)) 
     Mpts_ROI.LOGICPts = Mpts_ROI.select_lowest_pts(min_i_map, min_j_map, id_)
-    print("pass")
     Qpts.LOGICMat = (0b111 * (Qpts.binary_2d & -Qpts.binary_2d)) >> 1
     Qpts.LOGICPts= Qpts.select_lowest_pts(min_i_map, min_j_map, id_)
     LOGIC_trigger = Mpts_ROI.calculate_ground_distribution(Qpts.LOGICPts, Qpts_TMP, min_i_map, max_i_map, min_j_map, max_j_map, Mpts.dim_2d, center)
@@ -92,26 +92,26 @@ for id_ in range(96,101):
     trigger &= ~Mpts_ROI.LOGICMat 
 
 
-    fig, axs = plt.subplots(3, 3, figsize=(8,8))
-    axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
-    axs[0,0].set_title('Query 2d')
-    axs[0,1].imshow(np.log(Mpts.bqc_binary_2d), cmap='hot', interpolation='nearest')
-    axs[0,1].set_title('Prior Map bin 2d')
-    axs[1,0].imshow(Qpts.RPGMat, cmap='hot', interpolation='nearest')
-    axs[1,0].set_title('After RPG')
-    axs[1,1].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
-    axs[1,1].set_title('After RPG Mask')
-    axs[0,2].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
-    axs[0,2].set_title('binary_xor')
-    axs[1,2].imshow(np.log(trigger), cmap='hot', interpolation='nearest')
-    axs[1,2].set_title('trigger')
-    axs[2,0].imshow(np.log(LOGIC_trigger), cmap='hot', interpolation='nearest')
-    axs[2,2].set_title('LOGIC')
-    axs[2,2].imshow(np.log(Mpts_ROI.LOGICMat), cmap='hot', interpolation='nearest')
-    axs[2,2].set_title('Mpts_ROI.LOGICMat')
-    axs[2,1].imshow(np.log(Qpts.LOGICMat), cmap='hot', interpolation='nearest')
-    axs[2,1].set_title('Qpts.LOGICMat')
-    plt.show()
+    # fig, axs = plt.subplots(3, 3, figsize=(8,8))
+    # axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
+    # axs[0,0].set_title('Query 2d')
+    # axs[0,1].imshow(np.log(Mpts.bqc_binary_2d), cmap='hot', interpolation='nearest')
+    # axs[0,1].set_title('Prior Map bin 2d')
+    # axs[1,0].imshow(Qpts.RPGMat, cmap='hot', interpolation='nearest')
+    # axs[1,0].set_title('After RPG')
+    # axs[1,1].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
+    # axs[1,1].set_title('After RPG Mask')
+    # axs[0,2].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
+    # axs[0,2].set_title('binary_xor')
+    # axs[1,2].imshow(np.log(trigger), cmap='hot', interpolation='nearest')
+    # axs[1,2].set_title('trigger')
+    # axs[2,0].imshow(np.log(LOGIC_trigger), cmap='hot', interpolation='nearest')
+    # axs[2,2].set_title('LOGIC')
+    # axs[2,2].imshow(np.log(Mpts_ROI.LOGICMat), cmap='hot', interpolation='nearest')
+    # axs[2,2].set_title('Mpts_ROI.LOGICMat')
+    # axs[2,1].imshow(np.log(Qpts.LOGICMat), cmap='hot', interpolation='nearest')
+    # axs[2,1].set_title('Qpts.LOGICMat')
+    # plt.show()
 
     stt = time.time()
     for (i,j) in tqdm(list(zip(*np.where(trigger != 0))), desc=f"frame id {id_}: grids traverse"):
@@ -131,12 +131,24 @@ for id_ in range(96,101):
             tupleOfTuples = operator.itemgetter(*all3d_indexs)(Mpts.threeD2ptindex[i+min_i_map][j+min_j_map])
             points_index2Remove += [element for tupl in tupleOfTuples for element in tupl]
 
+    for (i,j) in tqdm(list(zip(*np.where(LOGIC_trigger!= 0))), desc=f"frame id {id_}: grids traverse"):
+        all3d_indexs = Mpts_ROI.binTo3id(LOGIC_trigger[i][j])
+        if (len(all3d_indexs)==0):
+            continue
+        elif(len(all3d_indexs)==1):
+            points_index2Remove_in_ROI += Mpts_ROI.threeD2ptindex[i+min_i_map][j+min_j_map][all3d_indexs[0]]
+        else:
+            tupleOfTuples = operator.itemgetter(*all3d_indexs)(Mpts_ROI.threeD2ptindex[i+min_i_map][j+min_j_map])
+            points_index2Remove_in_ROI += [element for tupl in tupleOfTuples for element in tupl] 
+
     print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("grid index 2 pts", ((time.time() - stt))*1000))
 print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("All processes", ((time.time() - st))*1000))
 
 print(f"\nThere are {len(points_index2Remove)} pts to remove")
-inlier_cloud = Mpts.select_by_index(points_index2Remove)
-oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True)
+inlier_cloud = Mpts.select_by_index(points_index2Remove) + Mpts_ROI.select_by_index(points_index2Remove_in_ROI)
+oulier_cloud = Mpts.select_by_index(points_index2Remove + Mpts_ROI.LOGIC_idx, invert=True) + Mpts_ROI.select_by_index(points_index2Remove_in_ROI, invert=True)
+# inlier_cloud = Mpts.select_by_index(points_index2Remove)
+# oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True)
 Mpts.view_compare(inlier_cloud, oulier_cloud)
 
 # fig, axs = plt.subplots(2, 2, figsize=(8,8))
