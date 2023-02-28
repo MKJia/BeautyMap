@@ -60,3 +60,14 @@ def gmm_kl(gmm_p, gmm_q, n_samples=10**3):
     log_p_X = gmm_p.score_samples(X[0])
     log_q_X = gmm_q.score_samples(X[0])
     return log_p_X.mean() - log_q_X.mean()
+
+import operator
+
+def SELECT_Ptsindex_from_matrix(all3d_indexs, threeD2ptindex, i, j, min_i_map, min_j_map):
+    if (len(all3d_indexs)==0):
+        return []
+    elif(len(all3d_indexs)==1):
+        return threeD2ptindex[i+min_i_map][j+min_j_map][all3d_indexs[0]]
+    else:
+        tupleOfTuples = operator.itemgetter(*all3d_indexs)(threeD2ptindex[i+min_i_map][j+min_j_map])
+        return [element for tupl in tupleOfTuples for element in tupl]
