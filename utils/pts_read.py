@@ -10,6 +10,9 @@ import numpy as np
 np.set_printoptions(threshold=np.inf)
 from sklearn.mixture import GaussianMixture
 RANDOM_SEED = 2023
+OPERATOR_BIT_UB = 62 # 64-bit with sign bit*1, valid range: 0-62
+LOWEST_GRID_NUM = 2
+LOGIC_BIT_UB = OPERATOR_BIT_UB//(LOWEST_GRID_NUM)
 
 import open3d as o3d
 import matplotlib.pyplot as plt
@@ -22,8 +25,10 @@ from utils.global_def import *
 
 from collections import defaultdict
 import time
+from tqdm import tqdm
+import operator
 class Points:
-    def __init__(self, file, range_m, resolution, h_res=0.5):
+    def __init__(self, file, range_m, resolution, h_res=0.2):
         ## 0. Read Point Cloud
         st = time.time()
         self.points = np.fromfile(file, dtype=np.float32).reshape(-1, 4)
@@ -44,11 +49,15 @@ class Points:
         self.gmmFitMatrix = defaultdict(lambda  : defaultdict(list))
         self.bin_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
         self.binary_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
+        self.LOGICMat = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
+        self.LOGIC_idx = []
 
         # open3d
         self.o3d_pts = o3d.geometry.PointCloud()
         self.o3d_pts.points = o3d.utility.Vector3dVector(self.points[:,:3])
         self.points = np.asarray(self.o3d_pts.points)
+        self.LOGICPts = np.asarray(self.o3d_pts.points)
+        self.LOGIC_PCD = o3d.geometry.PointCloud()
 
     def transform_from_TF_Matrix(self, T_MATRIX=np.eye(4)):
         self.points = np.insert(self.points, 0, np.array([0,0,0]),axis=0)
@@ -392,6 +401,58 @@ class Points:
         #                     self.binary_2d[i][j] = self.binary_2d[i][j] | (1<<(self.idz_c[i]).astype(int))
         TOC("Stack to binary 2D") 
 
+    def select_lowest_pts(self, min_i_map, min_j_map, id):
+        lowest_pts_idx = []
+        for (i,j) in tqdm(list(zip(*np.where(self.LOGICMat != 0))), desc=f"frame id {id}: grids traverse"): # lowest 2 voxel has points
+            all3d_indexs = self.binTo3id(self.LOGICMat[i][j])
+            if (len(all3d_indexs)>1):
+                tupleOfTuples = operator.itemgetter(*all3d_indexs)(self.threeD2ptindex[i+min_i_map][j+min_j_map])
+                lowest_pts_idx += [element for tupl in tupleOfTuples for element in tupl]
+            elif(len(all3d_indexs)==1):
+                lowest_pts_idx += self.threeD2ptindex[i+min_i_map][j+min_j_map][all3d_indexs[0]]
+            else:
+                continue
+        lowest_pts = self.select_by_index(lowest_pts_idx)
+        self.LOGIC_PCD = lowest_pts
+        self.LOGIC_idx = lowest_pts_idx
+        return lowest_pts.points
+
+    def calculate_ground_distribution(self, Q_LOGICpts, T, min_i_map, max_i_map, min_j_map, max_j_map, map_dim, center):
+        ## 1. save max min for range, refresh the range based on max and min
+        min_z = ((np.log2(self.LOGICMat+1)-0.5).astype(int) - 2 - self.idz_offset) * self.h_res
+        self.dim_2d = (int)(self.range_m/self.resolution)        
+        self.binary_2d = np.zeros((self.dim_2d, self.dim_2d), dtype=int)
+        binary_2d = np.zeros((map_dim, map_dim), dtype=int)
+        Q_LOGICpts_T = np.asarray(Q_LOGICpts) - center
+
+        ## 2. Voxelize Query STACK TO 2D TMP
+        idxy = (np.divide(Q_LOGICpts_T[...,:2],self.resolution/2)).astype(int) + map_dim//2
+        idz = (np.divide(Q_LOGICpts_T[...,2], max(0.05, self.h_res / LOGIC_BIT_UB))).astype(int)
+        adaptive_idz = (np.divide(Q_LOGICpts_T[...,2], self.h_res)).astype(int) # just initalize
+        for i, ptidxy in enumerate(idxy):
+            idx = ptidxy[0]
+            idy = ptidxy[1]
+            if idx <= max_i_map and idy<= max_j_map and idx>= min_i_map and idy>= min_j_map:
+                adaptive_idz[i] = (idz[i] - np.divide(min_z[idx - min_i_map - 1][idy - min_j_map - 1], max(0.05, self.h_res / LOGIC_BIT_UB))).astype(int)
+                if adaptive_idz[i]<=OPERATOR_BIT_UB and adaptive_idz[i]>=0:
+                    T.threeD2ptindex[idx][idy][adaptive_idz[i]].append(i)
+                    binary_2d[idx][idy] = binary_2d[idx][idy] | (1<<adaptive_idz[i])
+        T.binary_2d = binary_2d[min_i_map:max_i_map, min_j_map:max_j_map]
+
+        ## 2. Voxelize Map ROI STACK TO 2D self
+        idxy = (np.divide(np.asarray(self.LOGICPts)[...,:2],self.resolution/2)).astype(int) + self.dim_2d//2
+        idz = (np.divide(np.asarray(self.LOGICPts)[...,2], max(0.05, self.h_res / LOGIC_BIT_UB))).astype(int)
+        adaptive_idz = (np.divide(np.asarray(self.LOGICPts)[...,2], self.h_res)).astype(int) # just initalize
+
+        for i, ptidxy in enumerate(idxy):
+            idx = ptidxy[0]
+            idy = ptidxy[1]
+            if idx < self.dim_2d and idy<self.dim_2d and idx>=0 and idy>=0:
+                adaptive_idz[i] = (idz[i] - np.divide(min_z[idx][idy], max(0.05, self.h_res / LOGIC_BIT_UB))).astype(int)
+                if adaptive_idz[i]<=OPERATOR_BIT_UB and adaptive_idz[i]>=0:
+                    self.threeD2ptindex[idx][idy][adaptive_idz[i]].append(i)
+                    self.binary_2d[idx][idy] = self.binary_2d[idx][idy] | (1<<adaptive_idz[i])
+        return (T.binary_2d ^ self.binary_2d) & self.binary_2d # in fact this is the same as ~T.binary_2d & self.binary_2d
 
     @staticmethod
     def view_compare(inlier, outlier, others=None, view_file = None):

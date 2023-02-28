@@ -50,6 +50,8 @@ for id_ in range(96,101):
     T_Q[:3,-1]= np.array([pose[0],pose[1],pose[2]])
 
     Qpts = Points(f"data/bin/TPB/{id_:06d}.bin", RANGE, RESOLUTION)
+    Mpts_ROI = Points(f"data/bin/TPB/{id_:06d}.bin", RANGE, RESOLUTION)
+    Qpts_TMP = Points(f"data/bin/TPB/{id_:06d}.bin", RANGE, RESOLUTION)
     Qpts.transform_from_TF_Matrix(T_Q)
     center = Qpts.points[0,:]
     print("point center is ", center)
@@ -70,6 +72,15 @@ for id_ in range(96,101):
     Qpts.RangeMask = Qpts.generate_range_mask(int(RANGE_16_RING/RESOLUTION))
     # Qpts.SightMask = TODO: generate sight mask
     # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
+    # LOGIC
+    Mpts_ROI.threeD2ptindex = Mpts.threeD2ptindex
+    Mpts_ROI.o3d_pts = Mpts.o3d_pts
+    Mpts_ROI.LOGICMat = (0b11 * (Mpts.bqc_binary_2d & -Mpts.bqc_binary_2d)) 
+    Mpts_ROI.LOGICPts = Mpts_ROI.select_lowest_pts(min_i_map, min_j_map, id_)
+    print("pass")
+    Qpts.LOGICMat = (0b111 * (Qpts.binary_2d & -Qpts.binary_2d)) >> 1
+    Qpts.LOGICPts= Qpts.select_lowest_pts(min_i_map, min_j_map, id_)
+    LOGIC_trigger = Mpts_ROI.calculate_ground_distribution(Qpts.LOGICPts, Qpts_TMP, min_i_map, max_i_map, min_j_map, max_j_map, Mpts.dim_2d, center)
 
     binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.bqc_binary_2d)
     trigger = (~Qpts.binary_2d) & binary_xor & Mpts.bqc_binary_2d
@@ -78,23 +89,35 @@ for id_ in range(96,101):
     # trigger = trigger & (trigger - 1)
     trigger &= ~(Qpts.RPGMask - 1)
     trigger &= ~(Qpts.RangeMask - 1)
+    trigger &= ~Mpts_ROI.LOGICMat 
 
-    # fig, axs = plt.subplots(2, 2, figsize=(8,8))
-    # axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
-    # axs[0,0].set_title('Query 2d')
-    # axs[0,1].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
-    # axs[0,1].set_title('Prior Map bin 2d')
-    # axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
-    # axs[1,0].set_title('After RPG')
-    # axs[1,1].imshow(Qpts.RangeMask, cmap='hot', interpolation='nearest')
-    # axs[1,1].set_title('After RPG Mask')
-    # plt.show()
+
+    fig, axs = plt.subplots(3, 3, figsize=(8,8))
+    axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
+    axs[0,0].set_title('Query 2d')
+    axs[0,1].imshow(np.log(Mpts.bqc_binary_2d), cmap='hot', interpolation='nearest')
+    axs[0,1].set_title('Prior Map bin 2d')
+    axs[1,0].imshow(Qpts.RPGMat, cmap='hot', interpolation='nearest')
+    axs[1,0].set_title('After RPG')
+    axs[1,1].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
+    axs[1,1].set_title('After RPG Mask')
+    axs[0,2].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
+    axs[0,2].set_title('binary_xor')
+    axs[1,2].imshow(np.log(trigger), cmap='hot', interpolation='nearest')
+    axs[1,2].set_title('trigger')
+    axs[2,0].imshow(np.log(LOGIC_trigger), cmap='hot', interpolation='nearest')
+    axs[2,2].set_title('LOGIC')
+    axs[2,2].imshow(np.log(Mpts_ROI.LOGICMat), cmap='hot', interpolation='nearest')
+    axs[2,2].set_title('Mpts_ROI.LOGICMat')
+    axs[2,1].imshow(np.log(Qpts.LOGICMat), cmap='hot', interpolation='nearest')
+    axs[2,1].set_title('Qpts.LOGICMat')
+    plt.show()
 
     stt = time.time()
     for (i,j) in tqdm(list(zip(*np.where(trigger != 0))), desc=f"frame id {id_}: grids traverse"):
         max_obj_length = trigger[i][j] & (trigger[i][j]<<5)
         if max_obj_length != 0:
-            trigger[i][j] = trigger[i][j] & (~max_obj_length)& (~max_obj_length>>1)& (~max_obj_length>>2)& (~max_obj_length>>3)& (~max_obj_length>>4)& (~max_obj_length>>5)
+            trigger[i][j] = trigger[i][j] & (0b11111 * (~max_obj_length>>5))
         # for k in Mpts.twoD2ptindex[i+min_i_map][j+min_j_map]:
         #     if_delete = trigger[i][j] & (1<<Mpts.idz[k] if not(Mpts.idz[k]>62 or Mpts.idz[k]<0) else 0)
         #     if if_delete!=0:
