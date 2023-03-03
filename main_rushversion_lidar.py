@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
 from tqdm import tqdm
+from collections import defaultdict
 
 
 # vis
@@ -86,6 +87,7 @@ for id_ in range(96,101):
     Qpts.LOGICMat = (0b11 * (Qpts.binary_2d & -Qpts.binary_2d)) #>> 1
     Qpts.select_lowest_pts(min_i_map, min_j_map, id_, Mpts.global_center)
 
+    Mpts_ROI.threeD2ptindex = defaultdict(lambda  : defaultdict(lambda : defaultdict(list)))
 
     LOGIC_trigger = \
         Mpts_ROI.calculate_ground_distribution(Qpts.LOGICPts, 
@@ -101,6 +103,11 @@ for id_ in range(96,101):
     trigger &= ~(Qpts.RPGMask - 1)
     trigger &= ~(Qpts.RangeMask - 1)
     trigger &= ~Mpts_ROI.LOGICMat
+
+    
+    LOGIC_trigger &= ~(Qpts.RPGMask - 1)
+    LOGIC_trigger &= ~(Qpts.RangeMask - 1)
+
 
     stt = time.time()
     for (i,j) in list(zip(*np.where(trigger != 0))):
@@ -141,12 +148,12 @@ for id_ in range(96,101):
 print( "\033[1m\x1b[34m[%-15.15s] takes %10f ms\033[0m" %("All processes", ((time.time() - st))*1000))
 
 print(f"\nThere are {len(points_index2Remove)} pts to remove")
-inlier_cloud = Mpts.select_by_index(points_index2Remove)# + Mpts_ROI.select_by_index(points_index2Remove_in_ROI)
-oulier_cloud = Mpts.select_by_index(points_index2Remove + Mpts_ROI.LOGIC_idx, invert=True) + Mpts_ROI.select_by_index(points_index2Remove_in_ROI, invert=True)
+inlier_cloud = Mpts.select_by_index(points_index2Remove) #+ Mpts_ROI.select_by_index(points_index2Remove_in_ROI)
+oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True) #+ Mpts_ROI.LOGIC_PCD.select_by_index(points_index2Remove_in_ROI, invert=True)
 # inlier_cloud = Mpts.select_by_index(points_index2Remove)
 # oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True)
 # inlier_cloud = Qpts.o3d_pts
 # oulier_cloud = Mpts.o3d_pts
-Mpts.view_compare(inlier_cloud, oulier_cloud, others = Mpts_ROI.select_by_index(points_index2Remove_in_ROI),view_file="data/o3d_view/TPB.json")
+Mpts.view_compare(inlier_cloud, oulier_cloud, others = Mpts_ROI.LOGIC_PCD.select_by_index(points_index2Remove_in_ROI),view_file="data/o3d_view/TPB.json")
 
 print(f"{os.path.basename( __file__ )}: All codes run successfully, Close now..")

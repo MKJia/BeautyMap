@@ -13,6 +13,7 @@ RANDOM_SEED = 2023
 OPERATOR_BIT_UB = 62 # 64-bit with sign bit*1, valid range: 0-62
 LOWEST_GRID_NUM = 2
 LOGIC_BIT_UB = OPERATOR_BIT_UB//(LOWEST_GRID_NUM)
+MIN_RES = 0.02
 
 import open3d as o3d
 import matplotlib.pyplot as plt
@@ -279,7 +280,6 @@ class Points:
             _, unique_id = np.unique(self.idxyz, return_index=True, axis=0)
             self.unique_pts_with_id = self.points_with_id[unique_id]
 
-            print(self.points_with_id)
 
     def get_xyz_from_morton_id(self, input):
         x = input &        0x09249249
@@ -370,30 +370,33 @@ class Points:
 
         ## 2. Voxelize Query STACK TO 2D TMP
         idxy = (np.divide(Q_LOGICpts_T[...,:2],self.resolution)).astype(int) + map_dim//2
-        idz = (np.divide(Q_LOGICpts_T[...,2], max(0.05, self.h_res / LOGIC_BIT_UB))).astype(int)
+        idz = (np.divide(Q_LOGICpts_T[...,2], max(MIN_RES, self.h_res / LOGIC_BIT_UB))).astype(int)
         adaptive_idz = (np.divide(Q_LOGICpts_T[...,2], self.h_res)).astype(int) # just initalize
         for i, ptidxy in enumerate(idxy):
             idx, idy = ptidxy[0], ptidxy[1]
             if idx <= max_i_map and idy<= max_j_map and idx>= min_i_map and idy>= min_j_map:
-                adaptive_idz[i] = (idz[i] - np.divide(min_z[idx - min_i_map - 1][idy - min_j_map - 1], max(0.05, self.h_res / LOGIC_BIT_UB))).astype(int)
+                adaptive_idz[i] = (idz[i] - np.divide(min_z[idx - min_i_map - 1][idy - min_j_map - 1], max(MIN_RES, self.h_res / LOGIC_BIT_UB))).astype(int)
                 if adaptive_idz[i]<=OPERATOR_BIT_UB and adaptive_idz[i]>=0:
                     T.threeD2ptindex[idx][idy][adaptive_idz[i]].append(i)
                     binary_2d[idx][idy] = binary_2d[idx][idy] | (1<<adaptive_idz[i])
         T.binary_2d = binary_2d[min_i_map:max_i_map, min_j_map:max_j_map]
+        # Reinit tmp variable
+        binary_2d = np.zeros((map_dim, map_dim), dtype=int)
 
         # BUG are between this one ===============>
         ## 3. Voxelize Map ROI STACK TO 2D self
-        idxy = (np.divide(np.asarray(self.LOGICPts)[...,:2],self.resolution)).astype(int) + self.dim_2d//2
-        idz = (np.divide(np.asarray(self.LOGICPts)[...,2], max(0.05, self.h_res / LOGIC_BIT_UB))).astype(int)
+        idxy = (np.divide(np.asarray(self.LOGICPts)[...,:2],self.resolution)).astype(int) + map_dim//2
+        idz = (np.divide(np.asarray(self.LOGICPts)[...,2], max(MIN_RES, self.h_res / LOGIC_BIT_UB))).astype(int)
         adaptive_idz = (np.divide(np.asarray(self.LOGICPts)[...,2], self.h_res)).astype(int) # just initalize
 
         for i, ptidxy in enumerate(idxy):
             idx, idy = ptidxy[0], ptidxy[1]
-            if idx < self.dim_2d and idy<self.dim_2d and idx>=0 and idy>=0:
-                adaptive_idz[i] = (idz[i] - np.divide(min_z[idx][idy], max(0.05, self.h_res / LOGIC_BIT_UB))).astype(int)
+            if idx <= max_i_map and idy<= max_j_map and idx>= min_i_map and idy>= min_j_map:
+                adaptive_idz[i] = (idz[i] - np.divide(min_z[idx - min_i_map - 1][idy - min_j_map - 1], max(MIN_RES, self.h_res / LOGIC_BIT_UB))).astype(int)
                 if adaptive_idz[i]<=OPERATOR_BIT_UB and adaptive_idz[i]>=0:
                     self.threeD2ptindex[idx][idy][adaptive_idz[i]].append(i)
-                    self.binary_2d[idx][idy] = self.binary_2d[idx][idy] | (1<<adaptive_idz[i])
+                    binary_2d[idx][idy] = binary_2d[idx][idy] | (1<<adaptive_idz[i])
+        self.binary_2d = binary_2d[min_i_map:max_i_map, min_j_map:max_j_map]
         # BUG are between this one ===============<
         return (T.binary_2d ^ self.binary_2d) & self.binary_2d # in fact this is the same as ~T.binary_2d & self.binary_2d
 
