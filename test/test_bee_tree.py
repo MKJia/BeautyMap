@@ -29,7 +29,7 @@ from utils.bee_tree import BEETree
 starttime = time.time()
 
 RANGE = 10 # m, from cetner point to an square
-RESOLUTION = 1.0 # m, resolution default 1m
+RESOLUTION = 0.5 # m, resolution default 1m
 H_RES = 0.2 # m, resolution default 1m
 RANGE_16_RING = 8
 
