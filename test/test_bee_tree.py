@@ -76,10 +76,10 @@ for id_ in range(90,93):
     # Qpts.SightMask = TODO: generate sight mask
     # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
 
-    binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.binary_matrix)
+    map_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.binary_matrix)
+    binary_xor = (~Qpts.binary_matrix) & map_binary_matrix_roi
     trigger = (~Qpts.binary_matrix) & binary_xor
 
-    # trigger = trigger & (trigger - 1)
     trigger &= ~(Qpts.RPGMask - 1)
     trigger &= ~(Qpts.RangeMask - 1)
     # print(Qpts.binary_2d)
@@ -87,7 +87,7 @@ for id_ in range(90,93):
     fig, axs = plt.subplots(2, 2, figsize=(8,8))
     axs[0,0].imshow(np.log(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
     axs[0,0].set_title('Query 2d')
-    axs[0,1].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
+    axs[0,1].imshow(np.log(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
     axs[0,1].set_title('Prior Map bin 2d')
     axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
     axs[1,0].set_title('After RPG')
@@ -95,7 +95,7 @@ for id_ in range(90,93):
     axs[1,1].set_title('After RPG Mask')
     plt.show()
 
-
+    t = time.time()
     for (i,j) in list(zip(*np.where(trigger != 0))):
         z = Mpts.binTo3id(trigger[i][j])
         start_id_x = (int)(Qpts.start_xy[0] / Qpts.unit_x)
@@ -106,7 +106,7 @@ for id_ in range(90,93):
     #         if_delete = trigger[i][j] & (1<<Mpts.idz_c[k] if not(Mpts.idz_c[k]>62 or Mpts.idz_c[k]<0) else 0)
     #         if if_delete!=0:
     #             points_index2Remove = points_index2Remove + [k]
-
+    print(time.time() - t)
 print(f"There are {len(points_index2Remove)} pts to remove")
 TOC("All processes")
 

@@ -170,6 +170,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         m,n = len(self.pts_num_in_unit), len(self.pts_num_in_unit[0])
         res = [[0] * n for _ in range(m)]
         for i, j in itertools.product(range(m), range(n)):
+            if self.pts_num_in_unit[i][j] == 0:
+                res[i][j] = 0
+                continue
             count = 0
             for x, y in itertools.product(range(i-1, i+2), range(j-1, j+2)):
                 if 0 <= x < m and 0 <= y < n:
@@ -185,13 +188,12 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             range_mask[x][y] = 1
         return range_mask
     
-    def exclusive_with_other_binary_2d(self, map_binary_matrix):
+    def calculate_map_roi(self, map_binary_matrix):
         # compute the exclusive or
         start_id_x = (int)(self.start_xy[0] / self.unit_x)
         start_id_y = (int)(self.start_xy[1] / self.unit_y)
         map_binary_matrix_roi = map_binary_matrix[start_id_x:start_id_x+self.matrix_order][:, start_id_y:start_id_y+self.matrix_order]
-        print(start_id_x, start_id_y)
-        return (~self.binary_matrix) & map_binary_matrix_roi
+        return map_binary_matrix_roi
   
     def calculate_query_matrix_start_id(self):
         # compute the exclusive or
@@ -267,4 +269,13 @@ class BEENode:
                 self.children[i].register_points(pts[in_node_id], new_idz, hierarchical_unit_z, pts_id[in_node_id])
             self.binary_data |= 1<<i
         self.pts_id = pts_id
-        
+        self.pts_num = len(pts)
+
+    def get_num(self):
+        l = []
+        for i in range(SIZE_OF_INT):
+            if self.children[i] is not None:
+                l.append(self.children[i].pts_num)
+            else:
+                l.append(0)
+        return l
