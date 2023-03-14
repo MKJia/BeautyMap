@@ -16,8 +16,7 @@ from collections import defaultdict
 import copy
 from . import load_view_point
 
-SIZE_OF_INT64 = 64
-SIZE_OF_INT32 = 32
+SIZE_OF_INT = 32
 MIN_Z_RES = 0.02
 
 class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
@@ -192,7 +191,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         start_id_y = (int)(self.start_xy[1] / self.unit_y)
         map_binary_matrix_roi = map_binary_matrix[start_id_x:start_id_x+self.matrix_order][:, start_id_y:start_id_y+self.matrix_order]
         print(start_id_x, start_id_y)
-        return map_binary_matrix_roi ^ self.binary_matrix
+        return (~self.binary_matrix) & map_binary_matrix_roi
   
     def calculate_query_matrix_start_id(self):
         # compute the exclusive or
@@ -208,10 +207,22 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         inlier.paint_uniform_color([1.0, 0, 0])
         view_things.append(inlier)
         load_view_point(view_things, filename=view_file)
+
+    @staticmethod
+    def binTo3id(t):
+        tmp = []
+        cnt = 0
+        while t:
+            if t & 1 == 1:
+                tmp.append(cnt)
+            t = t >> 1
+            cnt += 1
+        return tmp
+        
 class BEENode:
     def __init__(self):
         self.binary_data = 0 # int64
-        self.children = np.empty(SIZE_OF_INT64, dtype=object) # ndarray(BEENode)[63]
+        self.children = np.empty(SIZE_OF_INT, dtype=object) # ndarray(BEENode)[63]
         self.pts_id = None
         self.pts_num = None
 
@@ -232,21 +243,21 @@ class BEENode:
             coerced to any supported types according to the casting rule ''safe'')
         """
         if unit_z > MIN_Z_RES: 
-            hierarchical_unit_z = max(MIN_Z_RES, unit_z / (SIZE_OF_INT64-1))
+            hierarchical_unit_z = max(MIN_Z_RES, unit_z / (SIZE_OF_INT-1))
         elif unit_z == MIN_Z_RES:
             hierarchical_unit_z = 0.0001
         else:
             self.children = None
             self.pts_id = pts_id
             return 0
-        for i in range(SIZE_OF_INT64):
+        for i in range(SIZE_OF_INT):
             overheight_id = np.where(idz>=i)
             in_node_id = np.where(idz==i)
-            if (i == SIZE_OF_INT64 - 1 or i == SIZE_OF_INT64) and overheight_id[0].size != 0:
+            if (i == SIZE_OF_INT - 1 or i == SIZE_OF_INT) and overheight_id[0].size != 0:
                 self.children[i] = BEENode()
                 new_idz = (np.divide(pts[overheight_id][...,2] - i * unit_z, hierarchical_unit_z)).astype(int)
                 self.children[i].register_points(pts[overheight_id], new_idz, hierarchical_unit_z, pts_id[overheight_id])
-                i = SIZE_OF_INT64 - 2 # to protect SIZE_OF_INT - 1
+                i = SIZE_OF_INT - 2 # to protect SIZE_OF_INT - 1
             elif in_node_id[0].size == 0:
                 self.children[i] = None
                 continue
@@ -256,3 +267,4 @@ class BEENode:
                 self.children[i].register_points(pts[in_node_id], new_idz, hierarchical_unit_z, pts_id[in_node_id])
             self.binary_data |= 1<<i
         self.pts_id = pts_id
+        

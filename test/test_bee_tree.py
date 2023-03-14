@@ -79,7 +79,6 @@ for id_ in range(90,93):
     binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.binary_matrix)
     trigger = (~Qpts.binary_matrix) & binary_xor
 
-    trigger = trigger & (trigger - 1) # for h_res = 0.5
     # trigger = trigger & (trigger - 1)
     trigger &= ~(Qpts.RPGMask - 1)
     trigger &= ~(Qpts.RangeMask - 1)
@@ -97,7 +96,12 @@ for id_ in range(90,93):
     plt.show()
 
 
-    # for (i,j) in list(zip(*np.where(trigger != 0))):
+    for (i,j) in list(zip(*np.where(trigger != 0))):
+        z = Mpts.binTo3id(trigger[i][j])
+        start_id_x = (int)(Qpts.start_xy[0] / Qpts.unit_x)
+        start_id_y = (int)(Qpts.start_xy[1] / Qpts.unit_y)
+        for idz in z:
+            points_index2Remove += (Mpts.root_matrix[i+start_id_x][j+start_id_y].children[idz].pts_id).tolist()
     #     for k in Mpts.twoD2ptindex[i][j]:
     #         if_delete = trigger[i][j] & (1<<Mpts.idz_c[k] if not(Mpts.idz_c[k]>62 or Mpts.idz_c[k]<0) else 0)
     #         if if_delete!=0:
