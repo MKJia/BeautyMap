@@ -102,13 +102,12 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         """
         points_in_map_frame = self.non_negtive_points - [self.start_xy[0], self.start_xy[1], 0]
         idxyz = (np.divide(points_in_map_frame,[self.unit_x, self.unit_y, self.unit_z])).astype(int)[:,:3]
-        t = time.time()
+
         ori_id = np.lexsort([idxyz[:,2], idxyz[:,1], idxyz[:,0]])
-        print(time.time()-t)
         newidxyz = idxyz[ori_id]
         # if(len(newidxyz) < 1000000):
         #     f = open("./log.txt", 'w+')
-        #     print((points_in_map_frame), file=f)
+        #     print((newidxyz), file=f)
         #     f.close()
         # idx = idxyz[:,0]
         # idy = idxyz[:,1]
@@ -126,8 +125,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         #         self.pts_num_in_unit[i][j] = len(pts_z)
         id_begin = np.array([],dtype=int)
         id_end = np.array([],dtype=int)
-
-        id_begin = [i for i, v in enumerate(newidxyz) if i == 0 or (v[0] != newidxyz[i-1][0] and v[1] != newidxyz[i-1][1])]
+        t = time.time()
+        id_begin = [i for i, v in enumerate(newidxyz) if i == 0 or (v[0] != newidxyz[i-1][0] or v[1] != newidxyz[i-1][1])]
+        print(time.time()-t)
         id_end = copy.deepcopy(id_begin)
         id_end.remove(0)
         id_end.append(len(newidxyz))

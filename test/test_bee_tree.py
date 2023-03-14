@@ -86,9 +86,9 @@ for id_ in range(90,93):
     # print(Qpts.binary_2d)
 
     fig, axs = plt.subplots(2, 2, figsize=(8,8))
-    # axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
-    # axs[0,0].set_title('Query 2d')
-    axs[0,1].imshow(np.log(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
+    axs[0,0].imshow(np.log(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
+    axs[0,0].set_title('Query 2d')
+    axs[0,1].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
     axs[0,1].set_title('Prior Map bin 2d')
     axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
     axs[1,0].set_title('After RPG')
@@ -97,11 +97,11 @@ for id_ in range(90,93):
     plt.show()
 
 
-    for (i,j) in list(zip(*np.where(trigger != 0))):
-        for k in Mpts.twoD2ptindex[i][j]:
-            if_delete = trigger[i][j] & (1<<Mpts.idz_c[k] if not(Mpts.idz_c[k]>62 or Mpts.idz_c[k]<0) else 0)
-            if if_delete!=0:
-                points_index2Remove = points_index2Remove + [k]
+    # for (i,j) in list(zip(*np.where(trigger != 0))):
+    #     for k in Mpts.twoD2ptindex[i][j]:
+    #         if_delete = trigger[i][j] & (1<<Mpts.idz_c[k] if not(Mpts.idz_c[k]>62 or Mpts.idz_c[k]<0) else 0)
+    #         if if_delete!=0:
+    #             points_index2Remove = points_index2Remove + [k]
 
 print(f"There are {len(points_index2Remove)} pts to remove")
 TOC("All processes")
