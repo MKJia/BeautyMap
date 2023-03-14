@@ -14,8 +14,9 @@ from utils import quat2mat
 import time
 from collections import defaultdict
 import copy
+from . import load_view_point
 
-SIZE_OF_INT32 = 64
+SIZE_OF_INT64 = 64
 SIZE_OF_INT32 = 32
 MIN_Z_RES = 0.02
 
@@ -42,7 +43,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         # tree structure
         self.root_matrix = None
         self.pts_num_in_unit = None
-        self.banary_matrix = None
+        self.binary_matrix = None
 
         #RPG
         self.RPGMat = None
@@ -101,7 +102,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         """
         points_in_map_frame = self.non_negtive_points - [self.start_xy[0], self.start_xy[1], 0]
         idxyz = (np.divide(points_in_map_frame,[self.unit_x, self.unit_y, self.unit_z])).astype(int)[:,:3]
+        t = time.time()
         ori_id = np.lexsort([idxyz[:,2], idxyz[:,1], idxyz[:,0]])
+        print(time.time()-t)
         newidxyz = idxyz[ori_id]
         # if(len(newidxyz) < 1000000):
         #     f = open("./log.txt", 'w+')
@@ -143,13 +146,13 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             self.pts_num_in_unit[idx][idy] = ie - ib
 
     def get_binary_matrix(self):
-        self.banary_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
+        self.binary_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
         for i in range(self.matrix_order):
             for j in range(self.matrix_order):
-                self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
-
-
-
+                if self.root_matrix[i][j] is None:
+                    self.binary_matrix[i][j] = 0
+                else:
+                    self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
 
     def transform_to_map_frame(self, pose, coordinate_offset):
         wxyz = np.array([pose[6],pose[3],pose[4],pose[5]])
@@ -164,7 +167,6 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.non_negtive_points = np.asarray(self.o3d_original_points.points - coordinate_offset)
         self.non_negtive_center = self.non_negtive_points[0,:]
 
-    ## 
     def smoother(self):
         m,n = len(self.pts_num_in_unit), len(self.pts_num_in_unit[0])
         res = [[0] * n for _ in range(m)]
@@ -186,20 +188,30 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
     
     def exclusive_with_other_binary_2d(self, map_binary_matrix):
         # compute the exclusive or
-        
-        print(map_binary_matrix)
-
-    
+        start_id_x = (int)(self.start_xy[0] / self.unit_x)
+        start_id_y = (int)(self.start_xy[1] / self.unit_y)
+        map_binary_matrix_roi = map_binary_matrix[start_id_x:start_id_x+self.matrix_order][:, start_id_y:start_id_y+self.matrix_order]
+        print(start_id_x, start_id_y)
+        return map_binary_matrix_roi ^ self.binary_matrix
+  
     def calculate_query_matrix_start_id(self):
         # compute the exclusive or
         start_point_x = self.non_negtive_center[0] - self.matrix_order / 2.0 * self.unit_x
         start_point_y = self.non_negtive_center[1] - self.matrix_order / 2.0 * self.unit_y
         self.start_xy = np.array([start_point_x, start_point_y])
-    
+
+    def view_compare(self, inlier, outlier, others=None, view_file = None):
+        view_things = [outlier]
+        if others is not None:
+            others.paint_uniform_color([0.0, 0.0, 0.0])
+            view_things.append(others)
+        inlier.paint_uniform_color([1.0, 0, 0])
+        view_things.append(inlier)
+        load_view_point(view_things, filename=view_file)
 class BEENode:
     def __init__(self):
         self.binary_data = 0 # int64
-        self.children = np.empty(SIZE_OF_INT32, dtype=object) # ndarray(BEENode)[63]
+        self.children = np.empty(SIZE_OF_INT64, dtype=object) # ndarray(BEENode)[63]
         self.pts_id = None
         self.pts_num = None
 
@@ -219,24 +231,28 @@ class BEENode:
             not supported for the input types, and the inputs could not be safely 
             coerced to any supported types according to the casting rule ''safe'')
         """
-        hierarchical_unit_z = max(MIN_Z_RES, unit_z / (SIZE_OF_INT32-1))
-        if unit_z == hierarchical_unit_z: 
-                self.children = None
-                self.pts_id = pts_id
-                return 0
-        for i in range(SIZE_OF_INT32):
+        if unit_z > MIN_Z_RES: 
+            hierarchical_unit_z = max(MIN_Z_RES, unit_z / (SIZE_OF_INT64-1))
+        elif unit_z == MIN_Z_RES:
+            hierarchical_unit_z = 0.0001
+        else:
+            self.children = None
+            self.pts_id = pts_id
+            return 0
+        for i in range(SIZE_OF_INT64):
             overheight_id = np.where(idz>=i)
             in_node_id = np.where(idz==i)
-            if i==SIZE_OF_INT32-1 and overheight_id[0].size != 0:
+            if (i == SIZE_OF_INT64 - 1 or i == SIZE_OF_INT64) and overheight_id[0].size != 0:
                 self.children[i] = BEENode()
                 new_idz = (np.divide(pts[overheight_id][...,2] - i * unit_z, hierarchical_unit_z)).astype(int)
                 self.children[i].register_points(pts[overheight_id], new_idz, hierarchical_unit_z, pts_id[overheight_id])
-                i = SIZE_OF_INT32 # to protect SIZE_OF_INT - 1
+                i = SIZE_OF_INT64 - 2 # to protect SIZE_OF_INT - 1
             elif in_node_id[0].size == 0:
                 self.children[i] = None
                 continue
             else:
                 self.children[i] = BEENode()
-                self.children[i].register_points(pts[in_node_id], idz[in_node_id], hierarchical_unit_z, pts_id[in_node_id])
+                new_idz = (np.divide(pts[in_node_id][...,2] - i * unit_z, hierarchical_unit_z)).astype(int)
+                self.children[i].register_points(pts[in_node_id], new_idz, hierarchical_unit_z, pts_id[in_node_id])
             self.binary_data |= 1<<i
         self.pts_id = pts_id

@@ -46,7 +46,7 @@ Mpts.calculate_matrix_order()
 t1 = time.time()
 Mpts.generate_binary_tree()
 print(time.time() - t1)
-# Mpts.set_pts_morton_id()
+Mpts.get_binary_matrix()
 print("finished")
 
 for id_ in range(90,93):
@@ -62,6 +62,7 @@ for id_ in range(90,93):
     t1 = time.time()
     Qpts.generate_binary_tree()
     print(time.time() - t1)
+    Qpts.get_binary_matrix()
     print("finished")
 
     # pre-process
@@ -75,8 +76,8 @@ for id_ in range(90,93):
     # Qpts.SightMask = TODO: generate sight mask
     # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
 
-    binary_xor = Qpts.exclusive_with_other_binary_2d([i.binary_data] for i in Mpts.root_matrix)
-    trigger = (~[i.binary_data] for i in Qpts.root_matrix) & binary_xor
+    binary_xor = Qpts.exclusive_with_other_binary_2d(Mpts.binary_matrix)
+    trigger = (~Qpts.binary_matrix) & binary_xor
 
     trigger = trigger & (trigger - 1) # for h_res = 0.5
     # trigger = trigger & (trigger - 1)
@@ -87,7 +88,7 @@ for id_ in range(90,93):
     fig, axs = plt.subplots(2, 2, figsize=(8,8))
     # axs[0,0].imshow(np.log(Qpts.binary_2d), cmap='hot', interpolation='nearest')
     # axs[0,0].set_title('Query 2d')
-    axs[0,1].imshow(np.log(binary_xor), cmap='hot', interpolation='nearest')
+    axs[0,1].imshow(np.log(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
     axs[0,1].set_title('Prior Map bin 2d')
     axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
     axs[1,0].set_title('After RPG')
@@ -108,8 +109,8 @@ TOC("All processes")
 endtime = time.time()
 print (endtime - starttime)
 
-inlier_cloud = Mpts.select_by_index(points_index2Remove)
-oulier_cloud = Mpts.select_by_index(points_index2Remove, invert=True)
+inlier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove)
+oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, invert=True)
 Mpts.view_compare(inlier_cloud, oulier_cloud)
 
 # fig, axs = plt.subplots(2, 2, figsize=(8,8))
