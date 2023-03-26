@@ -197,8 +197,8 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
   
     def calculate_query_matrix_start_id(self):
         # compute the exclusive or
-        start_point_x = self.non_negtive_center[0] - self.matrix_order / 2.0 * self.unit_x
-        start_point_y = self.non_negtive_center[1] - self.matrix_order / 2.0 * self.unit_y
+        start_point_x = (int)(self.non_negtive_center[0]) - self.matrix_order / 2.0 * self.unit_x
+        start_point_y = (int)(self.non_negtive_center[1]) - self.matrix_order / 2.0 * self.unit_y
         self.start_xy = np.array([start_point_x, start_point_y])
 
     def view_compare(self, inlier, outlier, others=None, view_file = None):
