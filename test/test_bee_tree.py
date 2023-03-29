@@ -30,7 +30,7 @@ starttime = time.time()
 
 RANGE = 10 # m, from cetner point to an square
 RESOLUTION = 0.5 # m, resolution default 1m
-H_RES = 0.2 # m, resolution default 1m
+H_RES = 0.5 # m, resolution default 1m
 RANGE_16_RING = 8
 
 TIC()
@@ -49,7 +49,7 @@ print(time.time() - t1)
 Mpts.get_binary_matrix()
 print("finished")
 
-for id_ in range(90,93):
+for id_ in range(60,105):
 
     Qpts = BEETree()
     Qpts.set_points_from_file(f"data/bin/TPB/{id_:06d}.bin")
@@ -78,22 +78,22 @@ for id_ in range(90,93):
 
     map_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.binary_matrix)
     binary_xor = (~Qpts.binary_matrix) & map_binary_matrix_roi
-    trigger = (~Qpts.binary_matrix) & binary_xor
+    trigger = binary_xor #(~Qpts.binary_matrix) & binary_xor
 
     trigger &= ~(Qpts.RPGMask - 1)
     trigger &= ~(Qpts.RangeMask - 1)
     # print(Qpts.binary_2d)
 
-    fig, axs = plt.subplots(2, 2, figsize=(8,8))
-    axs[0,0].imshow(np.log(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
-    axs[0,0].set_title('Query 2d')
-    axs[0,1].imshow(np.log(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
-    axs[0,1].set_title('Prior Map bin 2d')
-    axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
-    axs[1,0].set_title('After RPG')
-    axs[1,1].imshow(trigger, cmap='hot', interpolation='nearest')
-    axs[1,1].set_title('After RPG Mask')
-    plt.show()
+    # fig, axs = plt.subplots(2, 2, figsize=(8,8))
+    # axs[0,0].imshow(np.log(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
+    # axs[0,0].set_title('Query 2d')
+    # axs[0,1].imshow(np.log(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
+    # axs[0,1].set_title('Prior Map bin 2d')
+    # axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
+    # axs[1,0].set_title('After RPG')
+    # axs[1,1].imshow(trigger, cmap='hot', interpolation='nearest')
+    # axs[1,1].set_title('After RPG Mask')
+    # plt.show()
 
     t = time.time()
     for (i,j) in list(zip(*np.where(trigger != 0))):
@@ -107,7 +107,12 @@ for id_ in range(90,93):
     #         if if_delete!=0:
     #             points_index2Remove = points_index2Remove + [k]
     print(time.time() - t)
+
 print(f"There are {len(points_index2Remove)} pts to remove")
+
+visited = set()
+dup_index2Remove = list({x for x in points_index2Remove if x in visited or (visited.add(x) or False)})
+print(f"There are {len(dup_index2Remove)} pts to remove now")
 TOC("All processes")
 
 endtime = time.time()
