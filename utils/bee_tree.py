@@ -43,6 +43,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.root_matrix = None
         self.pts_num_in_unit = None
         self.binary_matrix = None
+        self.ground_binary_matrix = None
 
         #RPG
         self.RPGMat = None
@@ -153,6 +154,22 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                 else:
                     self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
 
+    def get_ground_hierachical_binary_matrix(self, ijh_index):
+        self.ground_binary_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
+        for i in range(self.matrix_order):
+            for j in range(self.matrix_order):
+                if self.root_matrix[i][j] is None or ijh_index[i][j] < 0 or self.root_matrix[i][j].children[ijh_index[i][j]] is None: # ijh_index = -9223372036854775808 if log2(0)
+                    self.ground_binary_matrix[i][j] = 0
+                else:
+                    self.ground_binary_matrix[i][j] = self.root_matrix[i][j].children[ijh_index[i][j]].binary_data
+
+    def get_ground_points_id(self, ijh_index, start_id_x = 0, start_id_y = 0):
+        tmp_list = []
+        for (i,j) in list(zip(*np.where(self.ground_binary_matrix != 0))):
+            z = self.binTo3id(self.ground_binary_matrix[i][j])
+            for idz in z:
+                tmp_list += (self.root_matrix[i+start_id_x][j+start_id_y].children[ijh_index[i][j]].children[idz].pts_id).tolist()
+    
     def transform_to_map_frame(self, pose, coordinate_offset):
         wxyz = np.array([pose[6],pose[3],pose[4],pose[5]])
         T_Q = np.eye(4)
@@ -209,6 +226,48 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         inlier.paint_uniform_color([1.0, 0, 0])
         view_things.append(inlier)
         load_view_point(view_things, filename=view_file)
+
+    def view_tree(self, ijh_index, depth, start_id_x = 0, start_id_y = 0):
+        if depth == 0:
+            view_list = []
+            for i in range(self.matrix_order):
+                for j in range(self.matrix_order):
+                    if self.root_matrix[i][j] is None:
+                        continue#self.binary_matrix[i][j] = 0
+                    else: # if has children
+                        for k in range(SIZE_OF_INT):
+                            if self.root_matrix[i][j].children[k] is None:
+                                continue
+                            else:
+                                virtual_point = [0,0,0]
+                                virtual_point[0] = (i + 0.5) * self.unit_x
+                                virtual_point[1] = (j + 0.5) * self.unit_y
+                                virtual_point[2] = (k + 0.5) * self.unit_z #self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
+                                view_list.append(virtual_point)
+            view_points = np.array(view_list, dtype=float)
+            o3d_view_points = o3d.geometry.PointCloud()
+            o3d_view_points.points = o3d.utility.Vector3dVector(view_points[:,:3]) 
+            return o3d_view_points
+        elif depth == 1:
+            view_list = []
+            for i in range(self.matrix_order):
+                for j in range(self.matrix_order):
+                    if self.root_matrix[i][j] is None or ijh_index[i][j] < 0 or self.root_matrix[i][j].children[ijh_index[i][j]] is None:
+                            continue
+                    else: # if has ground 2-nd children
+                        for k in range(SIZE_OF_INT):
+                            if self.root_matrix[i][j].children[ijh_index[i][j]].children[k] is None:
+                                continue
+                            else:
+                                virtual_point = [0,0,0]
+                                virtual_point[0] = (i + 0.5) * self.unit_x
+                                virtual_point[1] = (j + 0.5) * self.unit_y
+                                virtual_point[2] = (k + 0.5) * MIN_Z_RES + ijh_index[i][j] * self.unit_z #self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
+                                view_list.append(virtual_point)
+            view_points = np.array(view_list, dtype=float)
+            o3d_view_points = o3d.geometry.PointCloud()
+            o3d_view_points.points = o3d.utility.Vector3dVector(view_points[:,:3]) 
+            return o3d_view_points
 
     @staticmethod
     def binTo3id(t):

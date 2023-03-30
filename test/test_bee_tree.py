@@ -32,10 +32,12 @@ RANGE = 10 # m, from cetner point to an square
 RESOLUTION = 0.5 # m, resolution default 1m
 H_RES = 0.5 # m, resolution default 1m
 RANGE_16_RING = 8
+GROUND_THICK = 0.5
 
 TIC()
 
 points_index2Remove = []
+points_ground2Protect = []
 
 Mpts = BEETree()
 Mpts.set_points_from_file("data/bin/TPB_global_map.bin")
@@ -47,7 +49,12 @@ t1 = time.time()
 Mpts.generate_binary_tree()
 print(time.time() - t1)
 Mpts.get_binary_matrix()
+ijh_index = np.log2((Mpts.binary_matrix & -Mpts.binary_matrix)).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
+Mpts.get_ground_hierachical_binary_matrix(ijh_index) # for i,j in matrix, we extract the ground hierachical in the h_th height
+points_ground2Protect = Mpts.get_ground_points_id(ijh_index)
 print("finished")
+# view_pts = Mpts.view_tree(ijh_index, 0)
+# o3d.visualization.draw_geometries([view_pts])
 
 for id_ in range(60,105):
 
@@ -69,7 +76,7 @@ for id_ in range(60,105):
 
     # RPG
     Qpts.RPGMat = Qpts.smoother()
-    Qpts.RPGMask = Qpts.RPGMat > RESOLUTION**2 * 100
+    Qpts.RPGMask = Qpts.RPGMat > (RESOLUTION * RANGE)**2
 
     # DEAR
     Qpts.RangeMask = Qpts.generate_range_mask(int(RANGE_16_RING/RESOLUTION))
@@ -84,14 +91,21 @@ for id_ in range(60,105):
     trigger &= ~(Qpts.RangeMask - 1)
     # print(Qpts.binary_2d)
 
+    # map_ground_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.ground_binary_matrix)
+    # binary_xor_ground = map_ground_binary_matrix_roi
+
+    # for i in range(len(map_ground_binary_matrix_roi)):
+    #     print("================================================================")
+    #     for j in range(len(map_ground_binary_matrix_roi[0])):
+    #         print(bin(map_ground_binary_matrix_roi[i][j]).zfill(32))
     # fig, axs = plt.subplots(2, 2, figsize=(8,8))
-    # axs[0,0].imshow(np.log(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
+    # axs[0,0].imshow(np.log2(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
     # axs[0,0].set_title('Query 2d')
-    # axs[0,1].imshow(np.log(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
+    # axs[0,1].imshow(np.log2(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
     # axs[0,1].set_title('Prior Map bin 2d')
-    # axs[1,0].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
+    # axs[1,0].imshow(np.log2(map_ground_binary_matrix_roi), cmap='hot', interpolation='nearest')
     # axs[1,0].set_title('After RPG')
-    # axs[1,1].imshow(trigger, cmap='hot', interpolation='nearest')
+    # axs[1,1].imshow(np.log2(trigger), cmap='hot', interpolation='nearest')
     # axs[1,1].set_title('After RPG Mask')
     # plt.show()
 
