@@ -99,6 +99,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         Matrix -> BEETree(ROOT) -> BEENode...
         230307 TODO: remove np.where and change to another method for binary tree generation
             np.where needs to search all the list, though sometimes the aimed value is just the first one, which cost much time.
+        230331 TODO: add a variable(float) for min_z_matrix[i][j], and calculate the idz separately for each grid
         """
         points_in_map_frame = self.non_negtive_points - [self.start_xy[0], self.start_xy[1], 0]
         idxyz = (np.divide(points_in_map_frame,[self.unit_x, self.unit_y, self.unit_z])).astype(int)[:,:3]
@@ -138,10 +139,12 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             idy = newidxyz[ib][1]
             if idx < 0 or idy < 0 or idx >= self.matrix_order or idy >= self.matrix_order:
                 continue
-            idz = newidxyz[ib:ie][:,2]
+            # idz = newidxyz[ib:ie][:,2]
             pts_id = ori_id[ib:ie]
             pts = points_in_map_frame[pts_id]
             self.root_matrix[idx][idy] = BEENode()
+            self.root_matrix[idx][idy].min_z = min(pts[...,2])
+            idz = np.divide(pts[...,2] - self.root_matrix[idx][idy].min_z, self.unit_z).astype(int)
             self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
             self.pts_num_in_unit[idx][idy] = ie - ib
 
@@ -300,43 +303,25 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             o3d_view_points.colors = o3d.utility.Vector3dVector(view_points_colors[:, :3])
             return o3d_view_points
 
-    def get_ground_distribution_mask(self, ijh_index, start_id_x = 0, start_id_y = 0):
-        if depth == 1:
-            view_list = []
-            view_color = []
-            for i in range(self.matrix_order):
-                for j in range(self.matrix_order):
-                    if self.root_matrix[i][j] is None or ijh_index[i][j] < 0 or self.root_matrix[i][j].children[ijh_index[i][j]] is None:
+    def calculate_ground_distribution_mask(self):
+        ground_mask = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
+        for i in range(self.matrix_order):
+            for j in range(self.matrix_order):
+                if self.root_matrix[i][j] is None or self.root_matrix[i][j].children[0] is None:
+                        continue
+                else: # if has ground 2-nd children
+                    all_pts_num = self.root_matrix[i][j].children[0].pts_num
+                    pts_num = 0
+                    weight = 1.0
+                    for k in range(SIZE_OF_INT):
+                        if self.root_matrix[i][j].children[0].children[k] is None:
                             continue
-                    else: # if has ground 2-nd children
-                        all_pts_num = self.root_matrix[i][j].children[ijh_index[i][j]].pts_num
-                        pts_num = 0
-                        weight = 1.0
-                        for k in range(SIZE_OF_INT):
-                            if self.root_matrix[i][j].children[ijh_index[i][j]].children[k] is None:
-                                continue
-                            else:
-                                virtual_point = [0,0,0]
-                                virtual_point[0] = (i + 0.5) * self.unit_x
-                                virtual_point[1] = (j + 0.5) * self.unit_y
-                                virtual_point[2] = (k + 0.5) * MIN_Z_RES + ijh_index[i][j] * self.unit_z #self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
-                                view_list.append(virtual_point)
-                                virtural_color = [0, 0, 0]
-                                pts_num += self.root_matrix[i][j].children[ijh_index[i][j]].children[k].pts_num
-                                if pts_num *1.0 / all_pts_num > 0.95:
-                                    weight = 0.0
-                                virtural_color[0] = (1-weight) * 256
-                                virtural_color[1] = 0
-                                virtural_color[2] = 0
-
-                                view_color.append(virtural_color)
-            view_points = np.array(view_list, dtype=float)
-            view_points_colors = np.array(view_color, dtype=float)
-            print(view_points_colors)
-            o3d_view_points = o3d.geometry.PointCloud()
-            o3d_view_points.points = o3d.utility.Vector3dVector(view_points[:,:3]) 
-            o3d_view_points.colors = o3d.utility.Vector3dVector(view_points_colors[:, :3])
-            return o3d_view_points
+                        else:
+                            pts_num += self.root_matrix[i][j].children[0].children[k].pts_num
+                            print(i,j,pts_num,all_pts_num)
+                            if pts_num *1.0 / all_pts_num < 0.8:
+                                ground_mask[i][j] |= (1 << k)
+        return ground_mask
 
     @staticmethod
     def binTo3id(t):
@@ -355,6 +340,7 @@ class BEENode:
         self.children = np.empty(SIZE_OF_INT, dtype=object) # ndarray(BEENode)[63]
         self.pts_id = None
         self.pts_num = None
+        self.min_z = None
 
     def register_points(self, pts, idz, unit_z, pts_id):
         """Register all points in BEENodes
@@ -385,18 +371,19 @@ class BEENode:
             overheight_id = np.where(idz>=i)
             in_node_id = np.where(idz==i)
             if (i == SIZE_OF_INT - 1 or i == SIZE_OF_INT) and overheight_id[0].size != 0:
-                self.children[i] = BEENode()
                 new_idz = (np.divide(pts[overheight_id][...,2] - i * unit_z, hierarchical_unit_z)).astype(int)
-                self.children[i].register_points(pts[overheight_id], new_idz, hierarchical_unit_z, pts_id[overheight_id])
-                i = SIZE_OF_INT - 2 # to protect SIZE_OF_INT - 1
+                ii = SIZE_OF_INT - 2 # to protect SIZE_OF_INT - 1
+                self.children[ii] = BEENode()
+                self.children[ii].register_points(pts[overheight_id], new_idz, hierarchical_unit_z, pts_id[overheight_id])
             elif in_node_id[0].size == 0:
                 self.children[i] = None
                 continue
             else:
-                self.children[i] = BEENode()
+                ii = i
+                self.children[ii] = BEENode()
                 new_idz = (np.divide(pts[in_node_id][...,2] - i * unit_z, hierarchical_unit_z)).astype(int)
-                self.children[i].register_points(pts[in_node_id], new_idz, hierarchical_unit_z, pts_id[in_node_id])
-            self.binary_data |= 1<<i
+                self.children[ii].register_points(pts[in_node_id], new_idz, hierarchical_unit_z, pts_id[in_node_id])
+            self.binary_data |= 1<<ii
         self.pts_id = pts_id
         self.pts_num = len(pts)
 

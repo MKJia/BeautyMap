@@ -52,6 +52,8 @@ Mpts.get_binary_matrix()
 ijh_index = np.log2((Mpts.binary_matrix & -Mpts.binary_matrix)).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
 Mpts.get_ground_hierachical_binary_matrix(ijh_index) # for i,j in matrix, we extract the ground hierachical in the h_th height
 points_ground2Protect = Mpts.get_ground_points_id(ijh_index)
+ground_mask = Mpts.calculate_ground_distribution_mask()
+
 print("finished M")
 # view_pts = Mpts.view_tree(ijh_index, 1)
 # o3d.visualization.draw_geometries([view_pts])
@@ -93,10 +95,11 @@ for id_ in range(60,105):
     trigger &= ~(Qpts.RangeMask - 1)
     # print(Qpts.binary_2d)
 
-    print(trigger)
     map_ground_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.ground_binary_matrix)
     trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi)
-    print(map_binary_matrix_roi & -map_binary_matrix_roi)
+
+    map_ground_mask_roi = Qpts.calculate_map_roi(ground_mask)
+    ground_trigger = map_ground_mask_roi
     # for i in range(len(map_ground_binary_matrix_roi)):
     #     print("================================================================")
     #     for j in range(len(map_ground_binary_matrix_roi[0])):
@@ -117,8 +120,15 @@ for id_ in range(60,105):
         z = Mpts.binTo3id(trigger[i][j])
         for idz in z:
             points_index2Remove += (Mpts.root_matrix[i+start_id_x][j+start_id_y].children[idz].pts_id).tolist()
-
+        gz = Mpts.binTo3id(ground_trigger[i][j])
+        for idgz in gz:
+            points_index2Remove += (Mpts.root_matrix[i+start_id_x][j+start_id_y].children[0].children[idgz].pts_id).tolist()
     print(time.time() - t)
+
+
+
+
+
 
 print(f"There are {len(points_index2Remove)} pts to remove")
 
