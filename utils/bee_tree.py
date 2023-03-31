@@ -230,11 +230,14 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
     def view_tree(self, ijh_index, depth, start_id_x = 0, start_id_y = 0):
         if depth == 0:
             view_list = []
+            view_color = []
+            o3d_view_points = o3d.geometry.PointCloud()
             for i in range(self.matrix_order):
                 for j in range(self.matrix_order):
                     if self.root_matrix[i][j] is None:
                         continue#self.binary_matrix[i][j] = 0
                     else: # if has children
+                        all_pts_num = self.root_matrix[i][j].pts_num
                         for k in range(SIZE_OF_INT):
                             if self.root_matrix[i][j].children[k] is None:
                                 continue
@@ -244,17 +247,33 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                                 virtual_point[1] = (j + 0.5) * self.unit_y
                                 virtual_point[2] = (k + 0.5) * self.unit_z #self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
                                 view_list.append(virtual_point)
+                                virtural_color = [0, 0, 0]
+                                pts_num = self.root_matrix[i][j].children[k].pts_num
+                                if pts_num *1.0 / all_pts_num > 0.8:
+                                    pts_num = all_pts_num
+                                virtural_color[0] = 256-(int)(pts_num * 256.0 / all_pts_num) 
+                                virtural_color[1] = 0
+                                virtural_color[2] = 0
+
+                                view_color.append(virtural_color)
             view_points = np.array(view_list, dtype=float)
-            o3d_view_points = o3d.geometry.PointCloud()
-            o3d_view_points.points = o3d.utility.Vector3dVector(view_points[:,:3]) 
+            view_points_colors = np.array(view_color, dtype=float)
+            print(view_points_colors)
+            o3d_view_points.points = o3d.utility.Vector3dVector(view_points[:,:3])
+            o3d_view_points.colors = o3d.utility.Vector3dVector(view_points_colors[:, :3])
+            
             return o3d_view_points
         elif depth == 1:
             view_list = []
+            view_color = []
             for i in range(self.matrix_order):
                 for j in range(self.matrix_order):
                     if self.root_matrix[i][j] is None or ijh_index[i][j] < 0 or self.root_matrix[i][j].children[ijh_index[i][j]] is None:
                             continue
                     else: # if has ground 2-nd children
+                        all_pts_num = self.root_matrix[i][j].children[ijh_index[i][j]].pts_num
+                        pts_num = 0
+                        weight = 1.0
                         for k in range(SIZE_OF_INT):
                             if self.root_matrix[i][j].children[ijh_index[i][j]].children[k] is None:
                                 continue
@@ -264,9 +283,59 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                                 virtual_point[1] = (j + 0.5) * self.unit_y
                                 virtual_point[2] = (k + 0.5) * MIN_Z_RES + ijh_index[i][j] * self.unit_z #self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
                                 view_list.append(virtual_point)
+                                virtural_color = [0, 0, 0]
+                                pts_num += self.root_matrix[i][j].children[ijh_index[i][j]].children[k].pts_num
+                                if pts_num *1.0 / all_pts_num > 0.95:
+                                    weight = 0.0
+                                virtural_color[0] = (1-weight) * 256
+                                virtural_color[1] = 0
+                                virtural_color[2] = 0
+
+                                view_color.append(virtural_color)
             view_points = np.array(view_list, dtype=float)
+            view_points_colors = np.array(view_color, dtype=float)
+            print(view_points_colors)
             o3d_view_points = o3d.geometry.PointCloud()
             o3d_view_points.points = o3d.utility.Vector3dVector(view_points[:,:3]) 
+            o3d_view_points.colors = o3d.utility.Vector3dVector(view_points_colors[:, :3])
+            return o3d_view_points
+
+    def get_ground_distribution_mask(self, ijh_index, start_id_x = 0, start_id_y = 0):
+        if depth == 1:
+            view_list = []
+            view_color = []
+            for i in range(self.matrix_order):
+                for j in range(self.matrix_order):
+                    if self.root_matrix[i][j] is None or ijh_index[i][j] < 0 or self.root_matrix[i][j].children[ijh_index[i][j]] is None:
+                            continue
+                    else: # if has ground 2-nd children
+                        all_pts_num = self.root_matrix[i][j].children[ijh_index[i][j]].pts_num
+                        pts_num = 0
+                        weight = 1.0
+                        for k in range(SIZE_OF_INT):
+                            if self.root_matrix[i][j].children[ijh_index[i][j]].children[k] is None:
+                                continue
+                            else:
+                                virtual_point = [0,0,0]
+                                virtual_point[0] = (i + 0.5) * self.unit_x
+                                virtual_point[1] = (j + 0.5) * self.unit_y
+                                virtual_point[2] = (k + 0.5) * MIN_Z_RES + ijh_index[i][j] * self.unit_z #self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
+                                view_list.append(virtual_point)
+                                virtural_color = [0, 0, 0]
+                                pts_num += self.root_matrix[i][j].children[ijh_index[i][j]].children[k].pts_num
+                                if pts_num *1.0 / all_pts_num > 0.95:
+                                    weight = 0.0
+                                virtural_color[0] = (1-weight) * 256
+                                virtural_color[1] = 0
+                                virtural_color[2] = 0
+
+                                view_color.append(virtural_color)
+            view_points = np.array(view_list, dtype=float)
+            view_points_colors = np.array(view_color, dtype=float)
+            print(view_points_colors)
+            o3d_view_points = o3d.geometry.PointCloud()
+            o3d_view_points.points = o3d.utility.Vector3dVector(view_points[:,:3]) 
+            o3d_view_points.colors = o3d.utility.Vector3dVector(view_points_colors[:, :3])
             return o3d_view_points
 
     @staticmethod
@@ -306,10 +375,11 @@ class BEENode:
         if unit_z > MIN_Z_RES: 
             hierarchical_unit_z = max(MIN_Z_RES, unit_z / (SIZE_OF_INT-1))
         elif unit_z == MIN_Z_RES:
-            hierarchical_unit_z = 0.0001
+            hierarchical_unit_z = 0.0
         else:
             self.children = None
             self.pts_id = pts_id
+            self.pts_num = len(pts)
             return 0
         for i in range(SIZE_OF_INT):
             overheight_id = np.where(idz>=i)

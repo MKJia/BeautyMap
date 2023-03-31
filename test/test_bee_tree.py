@@ -52,8 +52,8 @@ Mpts.get_binary_matrix()
 ijh_index = np.log2((Mpts.binary_matrix & -Mpts.binary_matrix)).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
 Mpts.get_ground_hierachical_binary_matrix(ijh_index) # for i,j in matrix, we extract the ground hierachical in the h_th height
 points_ground2Protect = Mpts.get_ground_points_id(ijh_index)
-print("finished")
-# view_pts = Mpts.view_tree(ijh_index, 0)
+print("finished M")
+# view_pts = Mpts.view_tree(ijh_index, 1)
 # o3d.visualization.draw_geometries([view_pts])
 
 for id_ in range(60,105):
@@ -70,7 +70,9 @@ for id_ in range(60,105):
     Qpts.generate_binary_tree()
     print(time.time() - t1)
     Qpts.get_binary_matrix()
-    print("finished")
+    start_id_x = (int)(Qpts.start_xy[0] / Qpts.unit_x)
+    start_id_y = (int)(Qpts.start_xy[1] / Qpts.unit_y)
+    print("finished Q")
 
     # pre-process
 
@@ -91,9 +93,10 @@ for id_ in range(60,105):
     trigger &= ~(Qpts.RangeMask - 1)
     # print(Qpts.binary_2d)
 
-    # map_ground_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.ground_binary_matrix)
-    # binary_xor_ground = map_ground_binary_matrix_roi
-
+    print(trigger)
+    map_ground_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.ground_binary_matrix)
+    trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi)
+    print(map_binary_matrix_roi & -map_binary_matrix_roi)
     # for i in range(len(map_ground_binary_matrix_roi)):
     #     print("================================================================")
     #     for j in range(len(map_ground_binary_matrix_roi[0])):
@@ -112,14 +115,9 @@ for id_ in range(60,105):
     t = time.time()
     for (i,j) in list(zip(*np.where(trigger != 0))):
         z = Mpts.binTo3id(trigger[i][j])
-        start_id_x = (int)(Qpts.start_xy[0] / Qpts.unit_x)
-        start_id_y = (int)(Qpts.start_xy[1] / Qpts.unit_y)
         for idz in z:
             points_index2Remove += (Mpts.root_matrix[i+start_id_x][j+start_id_y].children[idz].pts_id).tolist()
-    #     for k in Mpts.twoD2ptindex[i][j]:
-    #         if_delete = trigger[i][j] & (1<<Mpts.idz_c[k] if not(Mpts.idz_c[k]>62 or Mpts.idz_c[k]<0) else 0)
-    #         if if_delete!=0:
-    #             points_index2Remove = points_index2Remove + [k]
+
     print(time.time() - t)
 
 print(f"There are {len(points_index2Remove)} pts to remove")
