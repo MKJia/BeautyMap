@@ -38,6 +38,8 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.poses = None
         self.start_xy = None
         self.matrix_order = None
+        self.start_id_x = None
+        self.start_id_y = None
 
         # tree structure
         self.root_matrix = None
@@ -210,9 +212,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
     
     def calculate_map_roi(self, map_binary_matrix):
         # compute the exclusive or
-        start_id_x = (int)(self.start_xy[0] / self.unit_x)
-        start_id_y = (int)(self.start_xy[1] / self.unit_y)
-        map_binary_matrix_roi = map_binary_matrix[start_id_x:start_id_x+self.matrix_order][:, start_id_y:start_id_y+self.matrix_order]
+        # start_id_x = (int)(self.start_xy[0] / self.unit_x)
+        # start_id_y = (int)(self.start_xy[1] / self.unit_y)
+        map_binary_matrix_roi = map_binary_matrix[self.start_id_x:self.start_id_x+self.matrix_order][:, self.start_id_y:self.start_id_y+self.matrix_order]
         return map_binary_matrix_roi
   
     def calculate_query_matrix_start_id(self):
@@ -220,6 +222,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         start_point_x = (int)(self.non_negtive_center[0]) - self.matrix_order / 2.0 * self.unit_x
         start_point_y = (int)(self.non_negtive_center[1]) - self.matrix_order / 2.0 * self.unit_y
         self.start_xy = np.array([start_point_x, start_point_y])
+        self.start_id_x = (int)(self.start_xy[0] / self.unit_x)
+        self.start_id_y = (int)(self.start_xy[1] / self.unit_y)
+
 
     def view_compare(self, inlier, outlier, others=None, view_file = None):
         view_things = [outlier]
@@ -318,7 +323,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                             continue
                         else:
                             pts_num += self.root_matrix[i][j].children[0].children[k].pts_num
-                            print(i,j,pts_num,all_pts_num)
+                            # print(i,j,pts_num,all_pts_num)
                             if pts_num *1.0 / all_pts_num < 0.8:
                                 ground_mask[i][j] |= (1 << k)
         return ground_mask

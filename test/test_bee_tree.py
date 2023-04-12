@@ -72,8 +72,6 @@ for id_ in range(60,105):
     Qpts.generate_binary_tree()
     print(time.time() - t1)
     Qpts.get_binary_matrix()
-    start_id_x = (int)(Qpts.start_xy[0] / Qpts.unit_x)
-    start_id_y = (int)(Qpts.start_xy[1] / Qpts.unit_y)
     print("finished Q")
 
     # pre-process
@@ -96,7 +94,7 @@ for id_ in range(60,105):
     # print(Qpts.binary_2d)
 
     map_ground_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.ground_binary_matrix)
-    trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi)
+    # trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi)
 
     map_ground_mask_roi = Qpts.calculate_map_roi(ground_mask)
     ground_trigger = map_ground_mask_roi
@@ -119,10 +117,10 @@ for id_ in range(60,105):
     for (i,j) in list(zip(*np.where(trigger != 0))):
         z = Mpts.binTo3id(trigger[i][j])
         for idz in z:
-            points_index2Remove += (Mpts.root_matrix[i+start_id_x][j+start_id_y].children[idz].pts_id).tolist()
+            points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[idz].pts_id).tolist()
         gz = Mpts.binTo3id(ground_trigger[i][j])
         for idgz in gz:
-            points_index2Remove += (Mpts.root_matrix[i+start_id_x][j+start_id_y].children[0].children[idgz].pts_id).tolist()
+            points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[0].children[idgz].pts_id).tolist()
     print(time.time() - t)
 
 
