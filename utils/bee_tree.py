@@ -38,14 +38,15 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.poses = None
         self.start_xy = None
         self.matrix_order = None
-        self.start_id_x = None
-        self.start_id_y = None
+        self.start_id_x = 0
+        self.start_id_y = 0
 
         # tree structure
         self.root_matrix = None
         self.pts_num_in_unit = None
         self.binary_matrix = None
         self.ground_binary_matrix = None
+        self.minz_matrix = None
 
         #RPG
         self.RPGMat = None
@@ -90,12 +91,13 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         print(max_x, min_x, max_y, min_y)
         self.matrix_order = max((max_x - min_x)/ self.unit_x, (max_y - min_y) / self.unit_y).astype(int) + 1  # old version self.dim_2d
         print(self.matrix_order)
+        self.minz_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=float) + float("inf") # Only for map, once
 
         ## Maybe the matrix do not need to be a square matrix? @Kin
         # self.matrix_columns = (max_x / self.unit_x).astype(int) + 1
         # self.matrix_rows = (max_y / self.unit_y).astype(int) + 1
 
-    def generate_binary_tree(self):
+    def generate_binary_tree(self, minz_matrix):
         """Generates a binary tree
 
         Matrix -> BEETree(ROOT) -> BEENode...
@@ -146,7 +148,8 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             pts = points_in_map_frame[pts_id]
             self.root_matrix[idx][idy] = BEENode()
             self.root_matrix[idx][idy].min_z = min(pts[...,2])
-            idz = np.divide(pts[...,2] - self.root_matrix[idx][idy].min_z, self.unit_z).astype(int)
+            min_z = min(self.root_matrix[idx][idy].min_z, minz_matrix[self.start_id_x+idx][self.start_id_y+idy])
+            idz = np.divide(pts[...,2] - min_z, self.unit_z).astype(int)
             self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
             self.pts_num_in_unit[idx][idy] = ie - ib
 
@@ -158,6 +161,13 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                     self.binary_matrix[i][j] = 0
                 else:
                     self.binary_matrix[i][j] = self.root_matrix[i][j].binary_data
+
+    def get_minz_matrix(self):
+        self.minz_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=float)
+        for i in range(self.matrix_order):
+            for j in range(self.matrix_order):
+                if self.root_matrix[i][j] is not None:
+                    self.minz_matrix[i][j] = self.root_matrix[i][j].min_z
 
     def get_ground_hierachical_binary_matrix(self, ijh_index):
         self.ground_binary_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=int)

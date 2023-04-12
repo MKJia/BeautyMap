@@ -46,9 +46,10 @@ Mpts.set_global_center_from_file('data/TPB_poses_lidar2body.csv')
 Mpts.non_negatification_all_map_points()
 Mpts.calculate_matrix_order()
 t1 = time.time()
-Mpts.generate_binary_tree()
+Mpts.generate_binary_tree(Mpts.minz_matrix)
 print(time.time() - t1)
 Mpts.get_binary_matrix()
+Mpts.get_minz_matrix()
 ijh_index = np.log2((Mpts.binary_matrix & -Mpts.binary_matrix)).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
 Mpts.get_ground_hierachical_binary_matrix(ijh_index) # for i,j in matrix, we extract the ground hierachical in the h_th height
 points_ground2Protect = Mpts.get_ground_points_id(ijh_index)
@@ -69,7 +70,7 @@ for id_ in range(60,105):
     Qpts.calculate_query_matrix_start_id()
 
     t1 = time.time()
-    Qpts.generate_binary_tree()
+    Qpts.generate_binary_tree(Mpts.minz_matrix)
     print(time.time() - t1)
     Qpts.get_binary_matrix()
     print("finished Q")
@@ -94,7 +95,7 @@ for id_ in range(60,105):
     # print(Qpts.binary_2d)
 
     map_ground_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.ground_binary_matrix)
-    # trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi)
+    trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi)
 
     map_ground_mask_roi = Qpts.calculate_map_roi(ground_mask)
     ground_trigger = map_ground_mask_roi
