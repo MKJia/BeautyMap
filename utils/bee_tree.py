@@ -149,6 +149,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             self.root_matrix[idx][idy] = BEENode()
             self.root_matrix[idx][idy].min_z = min(pts[...,2])
             min_z = min(self.root_matrix[idx][idy].min_z, minz_matrix[self.start_id_x+idx][self.start_id_y+idy])
+            self.root_matrix[idx][idy].min_z = min_z
             idz = np.divide(pts[...,2] - min_z, self.unit_z).astype(int)
             self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
             self.pts_num_in_unit[idx][idy] = ie - ib
@@ -325,6 +326,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                 if self.root_matrix[i][j] is None or self.root_matrix[i][j].children[0] is None:
                         continue
                 else: # if has ground 2-nd children
+                    print(bin(self.root_matrix[i][j].children[0].binary_data).zfill(32))
                     all_pts_num = self.root_matrix[i][j].children[0].pts_num
                     pts_num = 0
                     weight = 1.0
@@ -355,7 +357,7 @@ class BEENode:
         self.children = np.empty(SIZE_OF_INT, dtype=object) # ndarray(BEENode)[63]
         self.pts_id = None
         self.pts_num = None
-        self.min_z = None
+        self.min_z = float("inf")
 
     def register_points(self, pts, idz, unit_z, pts_id):
         """Register all points in BEENodes
@@ -386,17 +388,22 @@ class BEENode:
             overheight_id = np.where(idz>=i)
             in_node_id = np.where(idz==i)
             if (i == SIZE_OF_INT - 1 or i == SIZE_OF_INT) and overheight_id[0].size != 0:
-                new_idz = (np.divide(pts[overheight_id][...,2] - i * unit_z, hierarchical_unit_z)).astype(int)
+                new_idz = (np.divide(pts[overheight_id][...,2] - i * unit_z - self.min_z, hierarchical_unit_z)).astype(int)
                 ii = SIZE_OF_INT - 2 # to protect SIZE_OF_INT - 1
                 self.children[ii] = BEENode()
+                self.children[ii].min_z = min(pts[overheight_id][...,2])
                 self.children[ii].register_points(pts[overheight_id], new_idz, hierarchical_unit_z, pts_id[overheight_id])
             elif in_node_id[0].size == 0:
                 self.children[i] = None
                 continue
             else:
+                # if(unit_z == 0.5):
+                #     print(pts[in_node_id][...,2])
+                #     print(i)
                 ii = i
                 self.children[ii] = BEENode()
-                new_idz = (np.divide(pts[in_node_id][...,2] - i * unit_z, hierarchical_unit_z)).astype(int)
+                self.children[ii].min_z = min(pts[in_node_id][...,2])
+                new_idz = (np.divide(pts[in_node_id][...,2] - ii * unit_z - self.min_z, hierarchical_unit_z)).astype(int)
                 self.children[ii].register_points(pts[in_node_id], new_idz, hierarchical_unit_z, pts_id[in_node_id])
             self.binary_data |= 1<<ii
         self.pts_id = pts_id
