@@ -58,7 +58,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         ## 0. Read Point Cloud
         self.original_points = np.fromfile(filename, dtype=np.float32).reshape(-1, 4)
         self.o3d_original_points = o3d.geometry.PointCloud()
-        self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3]) 
+        self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
+        self.o3d_original_points.remove_statistical_outlier(nb_neighbors=10, std_ratio=1.0)
+        self.original_points = np.asarray(self.o3d_original_points.points)
         print(f"number of points: {self.original_points.shape}")
 
     def set_unit_params(self, unit_x, unit_y, unit_z):
@@ -193,7 +195,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         T_Q[:3,-1] = np.array([pose[0],pose[1],pose[2]])
 
 
-        self.original_points = np.insert(self.original_points, 0, np.array([0,0,0,0]), axis = 0)
+        self.original_points = np.insert(self.original_points, 0, np.array([0,0,0]), axis = 0)
         self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
         self.o3d_original_points.transform(T_Q)
         self.non_negtive_points = np.asarray(self.o3d_original_points.points - coordinate_offset)
