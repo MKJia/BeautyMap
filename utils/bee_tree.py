@@ -328,7 +328,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                 if self.root_matrix[i][j] is None or self.root_matrix[i][j].children[0] is None:
                         continue
                 else: # if has ground 2-nd children
-                    print(bin(self.root_matrix[i][j].children[0].binary_data).zfill(32))
+                    # print(str(i)+" "+str(j)+" "+str(bin(self.root_matrix[i][j].children[0].binary_data).zfill(32)))
                     all_pts_num = self.root_matrix[i][j].children[0].pts_num
                     pts_num = 0
                     weight = 1.0
@@ -338,7 +338,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                         else:
                             pts_num += self.root_matrix[i][j].children[0].children[k].pts_num
                             # print(i,j,pts_num,all_pts_num)
-                            if pts_num *1.0 / all_pts_num < 0.8:
+                            if pts_num *1.0 / all_pts_num >= 0.95:
                                 ground_mask[i][j] |= (1 << k)
         return ground_mask
 
