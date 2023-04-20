@@ -92,13 +92,16 @@ for id_ in range(60,105):
 
     trigger &= ~(Qpts.RPGMask - 1)
     trigger &= ~(Qpts.RangeMask - 1)
+    trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi)
     # print(Qpts.binary_2d)
 
-    map_ground_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.ground_binary_matrix)
-    trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi)
 
-    map_ground_mask_roi = Qpts.calculate_map_roi(ground_mask)
-    ground_trigger = map_ground_mask_roi
+    ground_index_matrix = np.log2((trigger & -trigger) >> 1).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
+    ground_trigger = Mpts.calculate_ground_mask(Qpts, ground_index_matrix)
+    # map_ground_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.ground_binary_matrix)
+    # map_ground_mask_roi = Qpts.calculate_map_roi(ground_mask)
+    # Mpts.get_ground_hierachical_binary_matrix(ground_index_matrix)
+
     # for i in range(len(map_ground_binary_matrix_roi)):
     #     print("================================================================")
     #     for j in range(len(map_ground_binary_matrix_roi[0])):
@@ -121,7 +124,7 @@ for id_ in range(60,105):
             points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[idz].pts_id).tolist()
         gz = Mpts.binTo3id(ground_trigger[i][j])
         for idgz in gz:
-            points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[0].children[idgz].pts_id).tolist()
+            points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[ground_index_matrix[i][j]].children[idgz].pts_id).tolist()
     print(time.time() - t)
 
 

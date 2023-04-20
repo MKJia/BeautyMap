@@ -59,7 +59,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.original_points = np.fromfile(filename, dtype=np.float32).reshape(-1, 4)
         self.o3d_original_points = o3d.geometry.PointCloud()
         self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
-        self.o3d_original_points.remove_statistical_outlier(nb_neighbors=10, std_ratio=1.0)
+        self.o3d_original_points.remove_statistical_outlier(nb_neighbors=100, std_ratio=0.5)
         self.original_points = np.asarray(self.o3d_original_points.points)
         print(f"number of points: {self.original_points.shape}")
 
@@ -340,6 +340,31 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                             # print(i,j,pts_num,all_pts_num)
                             if pts_num *1.0 / all_pts_num >= 0.95:
                                 ground_mask[i][j] |= (1 << k)
+        return ground_mask
+
+    def calculate_ground_mask(self, Qpts, ground_index_matrix):
+        ground_mask = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
+        for ii in range(Qpts.matrix_order):
+            i = ii + Qpts.start_id_x
+            for jj in range(Qpts.matrix_order):
+                j = jj + Qpts.start_id_y
+                cid = ground_index_matrix[ii][jj]
+                if cid < 0 or self.root_matrix[i][j] is None or self.root_matrix[i][j].children[cid] is None:
+                    continue
+                else: # if has ground 2-nd children
+                    # print(str(i)+" "+str(j)+" "+str(bin(self.root_matrix[i][j].children[0].binary_data).zfill(32)))
+                    all_pts_num = self.root_matrix[i][j].children[cid].pts_num
+                    pts_num = 0
+                    next = False
+                    for k in range(SIZE_OF_INT):
+                        if self.root_matrix[i][j].children[cid].children[k] is None:
+                            continue
+                        else:
+                            pts_num += self.root_matrix[i][j].children[cid].children[k].pts_num
+                            # print(i,j,pts_num,all_pts_num)
+                            if pts_num *1.0 / all_pts_num >= 0.85:
+                                ground_mask[ii][jj] |= ((1 & next) << k)
+                                next = True
         return ground_mask
 
     @staticmethod
