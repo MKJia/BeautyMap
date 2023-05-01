@@ -15,6 +15,7 @@ import time
 from collections import defaultdict
 import copy
 from . import load_view_point
+from .pcdpy3 import load_pcd
 
 SIZE_OF_INT = 32
 MIN_Z_RES = 0.02
@@ -56,22 +57,24 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
 
     def set_points_from_file(self, filename):
         ## 0. Read Point Cloud
-        self.original_points = np.fromfile(filename, dtype=np.float32).reshape(-1, 4)
+        # self.original_points = np.fromfile(filename, dtype=np.float32).reshape(-1, 4)
+        PointCloudData = load_pcd(filename)
+        # x, y, z, qw, qx, qy, qz
+        self.sensor_origin_pose = np.array(list(PointCloudData.get_metadata()['viewpoint']))
+        self.original_points = PointCloudData.np_data
         self.o3d_original_points = o3d.geometry.PointCloud()
         self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
         self.o3d_original_points.remove_statistical_outlier(nb_neighbors=100, std_ratio=0.5)
         self.original_points = np.asarray(self.o3d_original_points.points)
-        print(f"number of points: {self.original_points.shape}")
+
+        self.center = np.mean(self.original_points,axis=0)
+        self.start_xy = np.array([.0,.0]) # Only for map, once
+        print(f"Number of points: {self.original_points.shape}")
 
     def set_unit_params(self, unit_x, unit_y, unit_z):
         self.unit_x = unit_x
         self.unit_y = unit_y
         self.unit_z = unit_z
-
-    def set_global_center_from_file(self, filename):
-        self.poses = np.array(pd.read_csv(filename).values[:,2:], dtype=np.float32)
-        self.center = np.mean(self.poses[:,:3], axis=0)
-        self.start_xy = np.array([.0,.0]) # Only for map, once
         
     def non_negatification_all_map_points(self):
         """Makes all points x,y,z are non-negtive ones to store in matrix & binary tree, calculate new center and save offset for Querys
@@ -90,9 +93,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         max_y = max(self.non_negtive_points[...,1])
         min_x = min(self.non_negtive_points[...,0])
         min_y = min(self.non_negtive_points[...,1])
-        print(max_x, min_x, max_y, min_y)
+        print(f"Max/Min value on x: {max_x}/{min_x}, y: {max_y}/{min_y}")
         self.matrix_order = max((max_x - min_x)/ self.unit_x, (max_y - min_y) / self.unit_y).astype(int) + 1  # old version self.dim_2d
-        print(self.matrix_order)
+        # print(self.matrix_order)
         self.minz_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=float) + float("inf") # Only for map, once
 
         ## Maybe the matrix do not need to be a square matrix? @Kin
@@ -188,16 +191,8 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             for idz in z:
                 tmp_list += (self.root_matrix[i+start_id_x][j+start_id_y].children[ijh_index[i][j]].children[idz].pts_id).tolist()
     
-    def transform_to_map_frame(self, pose, coordinate_offset):
-        wxyz = np.array([pose[6],pose[3],pose[4],pose[5]])
-        T_Q = np.eye(4)
-        T_Q[:3,:3] = quat2mat(wxyz)
-        T_Q[:3,-1] = np.array([pose[0],pose[1],pose[2]])
-
-
-        self.original_points = np.insert(self.original_points, 0, np.array([0,0,0]), axis = 0)
+    def transform_on_points(self, coordinate_offset):
         self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
-        self.o3d_original_points.transform(T_Q)
         self.non_negtive_points = np.asarray(self.o3d_original_points.points - coordinate_offset)
         self.non_negtive_center = self.non_negtive_points[0,:]
 
