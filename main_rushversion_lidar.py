@@ -147,7 +147,8 @@ print (endtime - starttime)
 
 inlier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove)
 oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, invert=True)
-save_pcd(f"{DATA_FOLDER}/result_inlier.pcd", np.array(inlier_cloud.points))
+save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points))
+print(f"Saved {len(oulier_cloud.points)} data points to edomap_output.pcd.")
 # Mpts.view_compare(inlier_cloud, oulier_cloud)
 
 # fig, axs = plt.subplots(2, 2, figsize=(8,8))
