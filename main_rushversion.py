@@ -27,13 +27,13 @@ from utils.pcdpy3 import save_pcd
 
 starttime = time.time()
 
-RANGE = 10 # m, from cetner point to an square
-RESOLUTION = 0.5 # m, resolution default 1m
+RANGE = 100 # m, from cetner point to an square
+RESOLUTION = 1 # m, resolution default 1m
 H_RES = 0.5 # m, resolution default 1m
 RANGE_16_RING = 8
 GROUND_THICK = 0.5
-DATA_FOLDER = f"{BASE_DIR}/data/three_people_behind"
-# DATA_FOLDER = f"{BASE_DIR}/data/KITTI/00"
+# DATA_FOLDER = f"{BASE_DIR}/data/three_people_behind"
+DATA_FOLDER = f"{BASE_DIR}/data/KITTI/00"
 MAX_RUN_FILE_NUM = 10 # -1 for all files
 
 print(f"We will process the data in folder: {bc.BOLD}{DATA_FOLDER}{bc.ENDC}")
@@ -68,7 +68,7 @@ all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
 for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     if file_cnt>MAX_RUN_FILE_NUM and MAX_RUN_FILE_NUM!=-1:
         break
-    
+    print(f"file: {pcd_file}")
     Qpts = BEETree()
     Qpts.set_points_from_file(f"{DATA_FOLDER}/pcd/{pcd_file}")
     Qpts.set_unit_params(RESOLUTION, RESOLUTION, H_RES)
@@ -87,10 +87,10 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
 
     # RPG
     Qpts.RPGMat = Qpts.smoother()
-    Qpts.RPGMask = Qpts.RPGMat > (RESOLUTION * RANGE)**2
+    Qpts.RPGMask = Qpts.RPGMat > 0#(RESOLUTION * RANGE)**2
 
     # DEAR
-    Qpts.RangeMask = Qpts.generate_range_mask(int(RANGE_16_RING/RESOLUTION))
+    Qpts.RangeMask = Qpts.generate_range_mask(40)#int(RANGE_16_RING/RESOLUTION))
     # Qpts.SightMask = TODO: generate sight mask
     # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
 
@@ -119,7 +119,7 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     # axs[0,0].set_title('Query 2d')
     # axs[0,1].imshow(np.log2(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
     # axs[0,1].set_title('Prior Map bin 2d')
-    # axs[1,0].imshow(np.log2(map_ground_binary_matrix_roi), cmap='hot', interpolation='nearest')
+    # axs[1,0].imshow(Qpts.RangeMask, cmap='hot', interpolation='nearest')
     # axs[1,0].set_title('After RPG')
     # axs[1,1].imshow(np.log2(trigger), cmap='hot', interpolation='nearest')
     # axs[1,1].set_title('After RPG Mask')
@@ -148,6 +148,7 @@ print (endtime - starttime)
 inlier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove)
 oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, invert=True)
 save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points))
+save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))
 print(f"Saved {len(oulier_cloud.points)} data points to edomap_output.pcd.")
 # Mpts.view_compare(inlier_cloud, oulier_cloud)
 

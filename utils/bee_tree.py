@@ -18,7 +18,7 @@ from . import load_view_point
 from .pcdpy3 import load_pcd
 
 SIZE_OF_INT = 32
-MIN_Z_RES = 0.02
+MIN_Z_RES = 0.05
 
 class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
     def __init__(self): 
@@ -85,6 +85,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                              min(self.original_points[...,1]), 
                              min(self.original_points[...,2])])
         self.coordinate_offset = min_xyz
+        print(f"Min xyz: {min_xyz[0]}, {min_xyz[1]}, {min_xyz[2]} ")
         self.non_negtive_points = self.original_points[:,:3] - min_xyz
         self.non_negtive_center = self.center - min_xyz 
 
@@ -95,7 +96,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         min_y = min(self.non_negtive_points[...,1])
         print(f"Max/Min value on x: {max_x}/{min_x}, y: {max_y}/{min_y}")
         self.matrix_order = max((max_x - min_x)/ self.unit_x, (max_y - min_y) / self.unit_y).astype(int) + 1  # old version self.dim_2d
-        # print(self.matrix_order)
+        print(f"Matrix order: {self.matrix_order}")
         self.minz_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=float) + float("inf") # Only for map, once
 
         ## Maybe the matrix do not need to be a square matrix? @Kin
@@ -194,7 +195,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
     def transform_on_points(self, coordinate_offset):
         self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
         self.non_negtive_points = np.asarray(self.o3d_original_points.points - coordinate_offset)
-        self.non_negtive_center = self.non_negtive_points[0,:]
+        self.non_negtive_center = self.sensor_origin_pose[:3] - coordinate_offset #self.non_negtive_points[0,:]
 
     def smoother(self):
         m,n = len(self.pts_num_in_unit), len(self.pts_num_in_unit[0])
