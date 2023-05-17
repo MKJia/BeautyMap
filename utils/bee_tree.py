@@ -17,7 +17,8 @@ import copy
 from . import load_view_point
 from .pcdpy3 import load_pcd
 
-SIZE_OF_INT = 32
+SIZE_OF_INT = 32 # 64
+MAX_OF_INT = 0xffffffff # 0xffffffffffffffff
 MIN_Z_RES = 0.05
 
 class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
@@ -53,6 +54,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.RPGMat = None
         self.RPGMask = None
         self.RangeMask = None
+        self.SightMask = None
 
 
     def set_points_from_file(self, filename):
@@ -64,7 +66,10 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.original_points = PointCloudData.np_data
         self.o3d_original_points = o3d.geometry.PointCloud()
         self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
+        print(f"begin remove outlier")
+        dt = time.time()
         self.o3d_original_points.remove_statistical_outlier(nb_neighbors=100, std_ratio=0.5)
+        print(f"end remove outlier: {time.time()-dt}")
         self.original_points = np.asarray(self.o3d_original_points.points)
 
         self.center = np.mean(self.original_points,axis=0)
@@ -158,6 +163,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             self.root_matrix[idx][idy].min_z = min_z
             idz = np.divide(pts[...,2] - min_z, self.unit_z).astype(int)
             self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
+                # print(f"idx:{idx}, idy:{idy}, bdata:{bin(self.root_matrix[idx][idy].binary_data)}")
             self.pts_num_in_unit[idx][idy] = ie - ib
 
     def get_binary_matrix(self):
@@ -219,6 +225,18 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             range_mask[x][y] = 1
         return range_mask
     
+    def generate_sight_mask(self):
+        r = self.matrix_order
+        sight_mask = np.zeros((r, r), dtype=int)
+        no_ground = self.binary_matrix & (-2) # -0xffff fffe
+        highest_bit = (np.log2(no_ground+1)).astype(int)
+        for i, j in itertools.product(range(0, 0+r), range(0, 0+r)):
+            if highest_bit[i][j] > 0:
+                sight_mask[i][j] = MAX_OF_INT-(2**highest_bit[i][j])+1
+                # print(f"idx:{i}, idy:{j}, b= {bin(no_ground[i][j])}, bdata:{bin(sight_mask[i][j])}")
+                # print(f"b= {bin(no_ground[i][j])}, s={bin(sight_mask[i][j])}")
+        return sight_mask
+
     def calculate_map_roi(self, map_binary_matrix):
         # compute the exclusive or
         # start_id_x = (int)(self.start_xy[0] / self.unit_x)

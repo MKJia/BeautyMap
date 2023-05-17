@@ -25,6 +25,8 @@ from utils.global_def import *
 from utils.bee_tree import BEETree
 from utils.pcdpy3 import save_pcd
 
+import itertools
+
 starttime = time.time()
 
 RANGE = 100 # m, from cetner point to an square
@@ -34,7 +36,7 @@ RANGE_16_RING = 8
 GROUND_THICK = 0.5
 # DATA_FOLDER = f"{BASE_DIR}/data/three_people_behind"
 DATA_FOLDER = f"{BASE_DIR}/data/KITTI/00"
-MAX_RUN_FILE_NUM = 10 # -1 for all files
+MAX_RUN_FILE_NUM = 10 #10 # -1 for all files
 
 print(f"We will process the data in folder: {bc.BOLD}{DATA_FOLDER}{bc.ENDC}")
 points_index2Remove = []
@@ -81,7 +83,7 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts.generate_binary_tree(Mpts.minz_matrix)
     print(time.time() - t1)
     Qpts.get_binary_matrix()
-    print("finished Q, cost: ", time.time() - t1, " ms")
+    print("finished Q, cost: ", time.time() - t1, " s")
 
     # pre-process
 
@@ -90,19 +92,22 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts.RPGMask = Qpts.RPGMat > 0#(RESOLUTION * RANGE)**2
 
     # DEAR
-    Qpts.RangeMask = Qpts.generate_range_mask(40)#int(RANGE_16_RING/RESOLUTION))
-    # Qpts.SightMask = TODO: generate sight mask
+    Qpts.RangeMask = Qpts.generate_range_mask(50)#int(RANGE_16_RING/RESOLUTION))
+    Qpts.SightMask = Qpts.generate_sight_mask()
     # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
 
     map_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.binary_matrix)
     binary_xor = (~Qpts.binary_matrix) & map_binary_matrix_roi
     trigger = binary_xor #(~Qpts.binary_matrix) & binary_xor
 
-    trigger &= ~(Qpts.RPGMask - 1)
+    trigger &= ~(Qpts.RPGMask - 1) # ~(x-1) is to swap 0x0 and 0xfffffffffffff
     trigger &= ~(Qpts.RangeMask - 1)
-    trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi)
+    trigger &= ~Qpts.SightMask
+    trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi) # Remove the lowest of the trigger, which is further calculated in LOGIC
     # print(Qpts.binary_2d)
-
+    # for i, j in itertools.product(range(0, 0+Qpts.matrix_order), range(0, 0+Qpts.matrix_order)):
+    #     if trigger[i][j] != 0:
+    #         print(f"idx:{i}, idy:{j}, bdata:{bin(trigger[i][j])}")
 
     ground_index_matrix = np.log2((trigger & -trigger) >> 1).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
     ground_trigger = Mpts.calculate_ground_mask(Qpts, ground_index_matrix)
@@ -110,19 +115,15 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     # map_ground_mask_roi = Qpts.calculate_map_roi(ground_mask)
     # Mpts.get_ground_hierachical_binary_matrix(ground_index_matrix)
 
-    # for i in range(len(map_ground_binary_matrix_roi)):
-    #     print("================================================================")
-    #     for j in range(len(map_ground_binary_matrix_roi[0])):
-    #         print(bin(map_ground_binary_matrix_roi[i][j]).zfill(32))
     # fig, axs = plt.subplots(2, 2, figsize=(8,8))
     # axs[0,0].imshow(np.log2(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
     # axs[0,0].set_title('Query 2d')
     # axs[0,1].imshow(np.log2(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
     # axs[0,1].set_title('Prior Map bin 2d')
-    # axs[1,0].imshow(Qpts.RangeMask, cmap='hot', interpolation='nearest')
+    # axs[1,0].imshow(Qpts.SightMask, cmap='hot', interpolation='nearest')
     # axs[1,0].set_title('After RPG')
     # axs[1,1].imshow(np.log2(trigger), cmap='hot', interpolation='nearest')
-    # axs[1,1].set_title('After RPG Mask')
+    # axs[1,1].set_title('trigger')
     # plt.show()
 
     t = time.time()
