@@ -68,7 +68,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
         print(f"begin remove outlier")
         dt = time.time()
-        self.o3d_original_points.remove_statistical_outlier(nb_neighbors=100, std_ratio=0.5)
+        # self.o3d_original_points.remove_statistical_outlier(nb_neighbors=100, std_ratio=0.5)
         print(f"end remove outlier: {time.time()-dt}")
         self.original_points = np.asarray(self.o3d_original_points.points)
 
@@ -108,7 +108,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         # self.matrix_columns = (max_x / self.unit_x).astype(int) + 1
         # self.matrix_rows = (max_y / self.unit_y).astype(int) + 1
 
-    def generate_binary_tree(self, minz_matrix):
+    def generate_map_binary_tree(self):
         """Generates a binary tree
 
         Matrix -> BEETree(ROOT) -> BEENode...
@@ -147,6 +147,8 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         id_end = copy.deepcopy(id_begin)
         id_end.remove(0)
         id_end.append(len(newidxyz))
+        last_id_x = 0
+        last_id_y = 0
         for iid in range(len(id_begin)):
             ib = id_begin[iid]
             ie = id_end[iid]
@@ -158,12 +160,52 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             pts_id = ori_id[ib:ie]
             pts = points_in_map_frame[pts_id]
             self.root_matrix[idx][idy] = BEENode()
+            min_z = min(pts[...,2])
+            if self.root_matrix[last_id_x][last_id_y] != None and min_z - self.root_matrix[last_id_x][last_id_y].min_z <= -4.5:
+                min_z = self.root_matrix[last_id_x][last_id_y].min_z
+            self.root_matrix[idx][idy].min_z = min_z
+            idz = np.divide(pts[...,2] - self.root_matrix[idx][idy].min_z, self.unit_z).astype(int)
+            self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
+                # print(f"idx:{idx}, idy:{idy}, bdata:{bin(self.root_matrix[idx][idy].binary_data)}")
+            self.pts_num_in_unit[idx][idy] = ie - ib
+            last_id_y = idy
+            last_id_x = idx
+
+    def generate_query_binary_tree(self, minz_matrix):
+        """Generates a simple binary tree
+        """
+        points_in_map_frame = self.non_negtive_points - [self.start_xy[0], self.start_xy[1], 0]
+        idxyz = (np.divide(points_in_map_frame,[self.unit_x, self.unit_y, self.unit_z])).astype(int)[:,:3]
+
+        ori_id = np.lexsort([idxyz[:,2], idxyz[:,1], idxyz[:,0]])
+        newidxyz = idxyz[ori_id]
+
+        self.root_matrix = np.empty([self.matrix_order, self.matrix_order], dtype=object)
+        self.pts_num_in_unit = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
+
+        id_begin = np.array([],dtype=int)
+        id_end = np.array([],dtype=int)
+        t = time.time()
+        id_begin = [i for i, v in enumerate(newidxyz) if i == 0 or (v[0] != newidxyz[i-1][0] or v[1] != newidxyz[i-1][1])]
+        print(time.time()-t)
+        id_end = copy.deepcopy(id_begin)
+        id_end.remove(0)
+        id_end.append(len(newidxyz))
+        for iid in range(len(id_begin)):
+            ib = id_begin[iid]
+            ie = id_end[iid]
+            idx = newidxyz[ib][0]
+            idy = newidxyz[ib][1]
+            if idx < 0 or idy < 0 or idx >= self.matrix_order or idy >= self.matrix_order:
+                continue
+            pts_id = ori_id[ib:ie]
+            pts = points_in_map_frame[pts_id]
+            self.root_matrix[idx][idy] = BEENode()
             self.root_matrix[idx][idy].min_z = min(pts[...,2])
-            min_z = min(self.root_matrix[idx][idy].min_z, minz_matrix[self.start_id_x+idx][self.start_id_y+idy])
+            min_z = minz_matrix[self.start_id_x+idx][self.start_id_y+idy]
             self.root_matrix[idx][idy].min_z = min_z
             idz = np.divide(pts[...,2] - min_z, self.unit_z).astype(int)
             self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
-                # print(f"idx:{idx}, idy:{idy}, bdata:{bin(self.root_matrix[idx][idy].binary_data)}")
             self.pts_num_in_unit[idx][idy] = ie - ib
 
     def get_binary_matrix(self):
