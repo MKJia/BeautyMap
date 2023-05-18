@@ -147,8 +147,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         id_end = copy.deepcopy(id_begin)
         id_end.remove(0)
         id_end.append(len(newidxyz))
-        last_id_x = 0
-        last_id_y = 0
+
         for iid in range(len(id_begin)):
             ib = id_begin[iid]
             ie = id_end[iid]
@@ -161,15 +160,31 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             pts = points_in_map_frame[pts_id]
             self.root_matrix[idx][idy] = BEENode()
             min_z = min(pts[...,2])
-            if self.root_matrix[last_id_x][last_id_y] != None and min_z - self.root_matrix[last_id_x][last_id_y].min_z <= -4.5:
-                min_z = self.root_matrix[last_id_x][last_id_y].min_z
+            neighbour_array = self.calculate_median(idx, idy)
+            if len(neighbour_array) != 0:
+                min_z_median = np.median(neighbour_array)
+                min_z_MAD = np.median(np.abs(neighbour_array - min_z_median))
+                # print(f"x = {idx}, y={idy},med={min_z_median}, MAD={min_z_MAD}")
+                if min_z < min_z_median - 3 * min_z_MAD:
+                    # print(f"in {idx,idy}: min_z:{min_z} to {min_z_median - 3*min_z_MAD}")
+                    min_z = min_z_median - 3 * min_z_MAD
             self.root_matrix[idx][idy].min_z = min_z
             idz = np.divide(pts[...,2] - self.root_matrix[idx][idy].min_z, self.unit_z).astype(int)
             self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
                 # print(f"idx:{idx}, idy:{idy}, bdata:{bin(self.root_matrix[idx][idy].binary_data)}")
             self.pts_num_in_unit[idx][idy] = ie - ib
-            last_id_y = idy
-            last_id_x = idx
+
+    def calculate_median(self, idx, idy):
+        min_z_list = []
+        for x, y in itertools.product(range(idx-5, idx), range(idy-5, idy)):
+            if x < 0 or y < 0:
+                continue
+            if self.root_matrix[x][y] == None:
+                continue
+            min_z_list.append(self.root_matrix[x][y].min_z)
+        if len(min_z_list) < 15:
+            min_z_list = []
+        return np.asarray(min_z_list)
 
     def generate_query_binary_tree(self, minz_matrix):
         """Generates a simple binary tree
