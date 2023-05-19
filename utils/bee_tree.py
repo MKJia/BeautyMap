@@ -19,7 +19,7 @@ from .pcdpy3 import load_pcd
 
 SIZE_OF_INT = 32 # 64
 MAX_OF_INT = 0xffffffff # 0xffffffffffffffff
-MIN_Z_RES = 0.05
+MIN_Z_RES = 0.2
 
 class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
     def __init__(self): 
@@ -66,10 +66,10 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.original_points = PointCloudData.np_data
         self.o3d_original_points = o3d.geometry.PointCloud()
         self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
-        print(f"begin remove outlier")
-        dt = time.time()
+        # print(f"begin remove outlier")
+        # dt = time.time()
         # self.o3d_original_points.remove_statistical_outlier(nb_neighbors=100, std_ratio=0.5)
-        print(f"end remove outlier: {time.time()-dt}")
+        # print(f"end remove outlier: {time.time()-dt}")
         self.original_points = np.asarray(self.o3d_original_points.points)
 
         self.center = np.mean(self.original_points,axis=0)

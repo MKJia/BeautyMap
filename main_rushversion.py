@@ -29,7 +29,7 @@ import itertools
 
 starttime = time.time()
 
-RANGE = 100 # m, from cetner point to an square
+RANGE = 40 # m, from cetner point to an square
 RESOLUTION = 1 # m, resolution default 1m
 H_RES = 0.5 # m, resolution default 1m
 RANGE_16_RING = 8
@@ -40,7 +40,7 @@ MAX_RUN_FILE_NUM = -1 # -1 for all files
 
 print(f"We will process the data in folder: {bc.BOLD}{DATA_FOLDER}{bc.ENDC}")
 points_index2Remove = []
-points_ground2Protect = []
+# points_ground2Protect = []
 
 # read raw map or gt cloud
 raw_map_path = f"{DATA_FOLDER}/raw_map.pcd"
@@ -57,10 +57,10 @@ Mpts.generate_map_binary_tree()
 print("Generate binary tree in Map cost: ",time.time() - t1, " s")
 Mpts.get_binary_matrix()
 Mpts.get_minz_matrix()
-ijh_index = np.log2((Mpts.binary_matrix & -Mpts.binary_matrix)).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
-Mpts.get_ground_hierachical_binary_matrix(ijh_index) # for i,j in matrix, we extract the ground hierachical in the h_th height
-points_ground2Protect = Mpts.get_ground_points_id(ijh_index)
-ground_mask = Mpts.calculate_ground_distribution_mask()
+# ijh_index = np.log2((Mpts.binary_matrix & -Mpts.binary_matrix)).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
+# Mpts.get_ground_hierachical_binary_matrix(ijh_index) # for i,j in matrix, we extract the ground hierachical in the h_th height
+# points_ground2Protect = Mpts.get_ground_points_id(ijh_index)
+# ground_mask = Mpts.calculate_ground_distribution_mask()
 
 print("finished M, cost: ", time.time() - t1, " s")
 # view_pts = Mpts.view_tree(ijh_index, 1)
@@ -92,7 +92,7 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts.RPGMask = Qpts.RPGMat > 0#(RESOLUTION * RANGE)**2
 
     # DEAR
-    Qpts.RangeMask = Qpts.generate_range_mask(40)#int(RANGE_16_RING/RESOLUTION))
+    # Qpts.RangeMask = Qpts.generate_range_mask(40)#int(RANGE_16_RING/RESOLUTION))
     Qpts.SightMask = Qpts.generate_sight_mask()
     # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
 
@@ -101,7 +101,7 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     trigger = binary_xor #(~Qpts.binary_matrix) & binary_xor
 
     trigger &= ~(Qpts.RPGMask - 1) # ~(x-1) is to swap 0x0 and 0xfffffffffffff
-    trigger &= ~(Qpts.RangeMask - 1)
+    # trigger &= ~(Qpts.RangeMask - 1)
     trigger &= ~Qpts.SightMask
     trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi) # Remove the lowest of the trigger, which is further calculated in LOGIC
     # print(Qpts.binary_2d)
@@ -124,9 +124,9 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     # axs[0,0].set_title('Query 2d')
     # axs[0,1].imshow(np.log2(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
     # axs[0,1].set_title('Prior Map bin 2d')
-    # axs[1,0].imshow(Mpts.minz_matrix, cmap='hot', interpolation='nearest')
+    # axs[1,0].imshow(Qpts.SightMask, cmap='hot', interpolation='nearest')
     # axs[1,0].set_title('After RPG')
-    # axs[1,1].imshow(np.log2(trigger), cmap='hot', interpolation='nearest')
+    # axs[1,1].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
     # axs[1,1].set_title('trigger')
     # plt.show()
 
