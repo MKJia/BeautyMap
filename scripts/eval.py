@@ -1,0 +1,55 @@
+import csv
+import sys, os
+import numpy as np
+import math
+BASE_DIR = os.path.abspath(os.path.join( os.path.dirname( __file__ ), '..' ))
+sys.path.append(BASE_DIR)
+from utils.pcdpy3 import load_pcd
+from utils import cnt_staticAdynamic
+
+DATA_FOLDER = "/home/kin/workspace/DUFOMap/data/"
+METHODS_NAME = "edomap"
+# Step 1: Read your existing csv file
+with open(f'{BASE_DIR}/scripts/benchmark_results.csv', 'r') as file:
+    reader = csv.DictReader(file)
+    data = list(reader)
+
+# Step 2: Add a new method to the data
+for sequence in ["00"]:
+    print("Processing: ", sequence, " with method: ", METHODS_NAME)
+    gt_pcd_path = f"{DATA_FOLDER}/{sequence}/gt_cloud.pcd"
+    et_pcd_path = f"{DATA_FOLDER}/{sequence}/{METHODS_NAME}_output.pcd"
+    row_dict = {'Sequence': sequence, 'Methods': METHODS_NAME}
+    gt_pc_ = load_pcd(gt_pcd_path)
+    num_gt = cnt_staticAdynamic(gt_pc_.np_data)
+    et_pc_ = load_pcd(et_pcd_path)
+
+    assert et_pc_.np_data.shape[0] == gt_pc_.np_data.shape[0] , \
+        f"{et_pcd_path} Error: The number of points in et_pc_ and gt_pc_ do not match.\
+        \nThey must match for evaluation, if not Please run `export_eval_pcd`."
+    
+    right_dynamic = np.count_nonzero((et_pc_.np_data[:,3] == 1) * (gt_pc_.np_data[:,3] == 1)) # TP
+    wrong_dynamic = np.count_nonzero((et_pc_.np_data[:,3] == 1) * (gt_pc_.np_data[:,3] == 0)) # FP
+    right_static = np.count_nonzero((et_pc_.np_data[:,3] == 0) * (gt_pc_.np_data[:,3] == 0)) # TN
+    wrong_static = np.count_nonzero((et_pc_.np_data[:,3] == 0) * (gt_pc_.np_data[:,3] == 1)) # FN
+
+    static_accuracy = float(right_static) / float(num_gt['static']) * 100
+    dynamic_accuracy = float(right_dynamic) / float(num_gt['dynamic']) * 100
+    AA = math.sqrt(static_accuracy*dynamic_accuracy)
+
+    row_dict['# TN'], row_dict['# FN'], row_dict['# TP'], row_dict['# FP'], row_dict['SA ↑'], row_dict['DA ↑'], row_dict['AA ↑'] =\
+        right_static, wrong_static, right_dynamic, wrong_dynamic, static_accuracy, dynamic_accuracy, AA
+    data.append(row_dict)
+
+import csv
+from tabulate import tabulate
+# print
+sequences = set([row['Sequence'] for row in data])
+for sequence in ["00"]: #sequences:
+    filtered_data = [row for row in data if row['Sequence'] == sequence]
+    table_data = [[row['Methods'], row['# TN'], row['# TP'], row['SA ↑'], row['DA ↑'], row['AA ↑']] for row in filtered_data]
+
+    # print the data
+    print('Sequence: ', sequence)
+    print(tabulate(table_data, headers=['Methods', '# static', '# dynamics', 'SA ↑', 'DA ↑', 'AA ↑'], tablefmt='orgtbl'))
+    print('='*30)

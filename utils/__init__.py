@@ -8,6 +8,12 @@ import numpy as np
 import open3d as o3d
 from .o3d_view import ViewControl
 
+def cnt_staticAdynamic(np_data : np.ndarray):
+    dynamic_cnt = np.count_nonzero(np_data[:,3])
+    static_cnt = np_data.shape[0] - dynamic_cnt
+    num_dict = {'static': static_cnt, 'dynamic': dynamic_cnt}
+    return num_dict
+
 def save_view_point(viewThings: list, filename):
     vis = o3d.visualization.Visualizer()
     vis.create_window()

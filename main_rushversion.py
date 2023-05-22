@@ -145,16 +145,22 @@ print(f"There are {len(points_index2Remove)} pts to remove")
 visited = set()
 dup_index2Remove = list({x for x in points_index2Remove if x in visited or (visited.add(x) or False)})
 print(f"There are {len(dup_index2Remove)} pts to remove now")
-TOC("All processes")
-
-endtime = time.time()
-print (endtime - starttime)
+print(f" running time: {time.time() - starttime}")
 
 inlier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove)
 oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, invert=True)
-save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points))
-save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))
-print(f"Saved {len(oulier_cloud.points)} data points to edomap_output.pcd.")
+
+outliers = np.array(oulier_cloud.points)
+inliers = np.array(inlier_cloud.points)
+
+outliers = np.c_[outliers, np.zeros((outliers.shape[0], 1))]
+inliers = np.c_[inliers, np.ones((inliers.shape[0], 1))]
+combined = np.concatenate((outliers, inliers), axis=0)
+save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", combined)
+
+# save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points))
+# save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))
+# print(f"Saved {len(oulier_cloud.points)} data points to edomap_output.pcd.")
 # Mpts.view_compare(inlier_cloud, oulier_cloud)
 
 # fig, axs = plt.subplots(2, 2, figsize=(8,8))
