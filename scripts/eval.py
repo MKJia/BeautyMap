@@ -9,13 +9,15 @@ from utils import cnt_staticAdynamic
 
 DATA_FOLDER = "/home/kin/workspace/DUFOMap/data/"
 METHODS_NAME = "edomap"
+SEQUENCE_SELECT = ["00"]
+
 # Step 1: Read your existing csv file
 with open(f'{BASE_DIR}/scripts/benchmark_results.csv', 'r') as file:
     reader = csv.DictReader(file)
     data = list(reader)
 
 # Step 2: Add a new method to the data
-for sequence in ["00"]:
+for sequence in SEQUENCE_SELECT:
     print("Processing: ", sequence, " with method: ", METHODS_NAME)
     gt_pcd_path = f"{DATA_FOLDER}/{sequence}/gt_cloud.pcd"
     et_pcd_path = f"{DATA_FOLDER}/{sequence}/{METHODS_NAME}_output.pcd"
@@ -45,11 +47,11 @@ import csv
 from tabulate import tabulate
 # print
 sequences = set([row['Sequence'] for row in data])
-for sequence in ["00"]: #sequences:
+for sequence in SEQUENCE_SELECT: #sequences:
     filtered_data = [row for row in data if row['Sequence'] == sequence]
     table_data = [[row['Methods'], row['# TN'], row['# TP'], row['SA ↑'], row['DA ↑'], row['AA ↑']] for row in filtered_data]
 
     # print the data
     print('Sequence: ', sequence)
-    print(tabulate(table_data, headers=['Methods', '# static', '# dynamics', 'SA ↑', 'DA ↑', 'AA ↑'], tablefmt='orgtbl'))
-    print('='*30)
+    print(tabulate(table_data, headers=['Methods', '# TN', '# TP', 'SA ↑', 'DA ↑', 'AA ↑'], tablefmt='orgtbl'))
+    print('='*20, ' Friendly dividing line ^v^ ', '='*20, '\n')
