@@ -1,7 +1,7 @@
 *.pcd
 *.bin
 *.label
-*.csv
+# *.csv
 
 .vscode/*
 

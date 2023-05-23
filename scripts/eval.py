@@ -20,7 +20,8 @@ with open(f'{BASE_DIR}/scripts/benchmark_results.csv', 'r') as file:
 for sequence in SEQUENCE_SELECT:
     print("Processing: ", sequence, " with method: ", METHODS_NAME)
     gt_pcd_path = f"{DATA_FOLDER}/{sequence}/gt_cloud.pcd"
-    et_pcd_path = f"{DATA_FOLDER}/{sequence}/{METHODS_NAME}_output.pcd"
+    et_pcd_path = f"{DATA_FOLDER}/{sequence}/eval/{METHODS_NAME}_output_exportGT.pcd"
+    assert os.path.exists(et_pcd_path), f"{et_pcd_path} does not exist. Please run c++ `export_eval_pcd`"
     row_dict = {'Sequence': sequence, 'Methods': METHODS_NAME}
     gt_pc_ = load_pcd(gt_pcd_path)
     num_gt = cnt_staticAdynamic(gt_pc_.np_data)

@@ -35,8 +35,8 @@ H_RES = 0.5 # m, resolution default 1m
 RANGE_16_RING = 8
 GROUND_THICK = 0.5
 # DATA_FOLDER = f"{BASE_DIR}/data/three_people_behind"
-DATA_FOLDER = f"{BASE_DIR}/data/KITTI/00"
-MAX_RUN_FILE_NUM = -1 # -1 for all files
+DATA_FOLDER = f"/home/kin/workspace/DUFOMap/data/00"
+MAX_RUN_FILE_NUM = 20 # -1 for all files
 
 print(f"We will process the data in folder: {bc.BOLD}{DATA_FOLDER}{bc.ENDC}")
 points_index2Remove = []
@@ -150,13 +150,13 @@ print(f" running time: {time.time() - starttime}")
 inlier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove)
 oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, invert=True)
 
-outliers = np.array(oulier_cloud.points)
-inliers = np.array(inlier_cloud.points)
+# outliers = np.array(oulier_cloud.points)
+# inliers = np.array(inlier_cloud.points)
 
-outliers = np.c_[outliers, np.zeros((outliers.shape[0], 1))]
-inliers = np.c_[inliers, np.ones((inliers.shape[0], 1))]
-combined = np.concatenate((outliers, inliers), axis=0)
-save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", combined)
+# outliers = np.c_[outliers, np.zeros((outliers.shape[0], 1))]
+# inliers = np.c_[inliers, np.ones((inliers.shape[0], 1))]
+# combined = np.concatenate((outliers, inliers), axis=0)
+save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points)) # static map
 
 # save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points))
 # save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))

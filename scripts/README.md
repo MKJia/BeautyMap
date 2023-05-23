@@ -13,6 +13,12 @@ SEQUENCE_SELECT = ["00"]
 Then run:
 
 ```bash
+cd scripts
+cmake -B build && cmake --build build
+./build/export_eval_pcd ${data_path} ${method_name}_output.pcd ${min_dis}
+
+# example
+./build/export_eval_pcd /home/kin/workspace/DUFOMap/data/00 edomap_output.pcd 0.05
 python scripts/eval.py
 ```
 
