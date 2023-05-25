@@ -287,12 +287,13 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         r = self.matrix_order
         sight_mask = np.zeros((r, r), dtype=int)
         no_ground = self.binary_matrix & (-2) # -0xffff fffe
+        ground = self.binary_matrix & 1
         highest_bit = (np.log2(no_ground+1)).astype(int)
         for i, j in itertools.product(range(0, 0+r), range(0, 0+r)):
-            if highest_bit[i][j] > 0:
+            if ground[i][j] == 0:
+                sight_mask[i][j] = MAX_OF_INT
+            elif highest_bit[i][j] > 0:
                 sight_mask[i][j] = MAX_OF_INT-(2**highest_bit[i][j])+1
-                # print(f"idx:{i}, idy:{j}, b= {bin(no_ground[i][j])}, bdata:{bin(sight_mask[i][j])}")
-                # print(f"b= {bin(no_ground[i][j])}, s={bin(sight_mask[i][j])}")
         return sight_mask
 
     def calculate_map_roi(self, map_binary_matrix):
