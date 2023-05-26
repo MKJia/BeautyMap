@@ -35,8 +35,8 @@ H_RES = 0.5 # m, resolution default 1m
 RANGE_16_RING = 8
 GROUND_THICK = 0.5
 # DATA_FOLDER = f"{BASE_DIR}/data/three_people_behind"
-DATA_FOLDER = f"/home/kin/workspace/DUFOMap/data/00"
-MAX_RUN_FILE_NUM = 20 # -1 for all files
+DATA_FOLDER = f"/home/ubuntu/repositories/edo_ws/edomap/data/KITTI/00"
+MAX_RUN_FILE_NUM = -1 # -1 for all files
 
 print(f"We will process the data in folder: {bc.BOLD}{DATA_FOLDER}{bc.ENDC}")
 points_index2Remove = []
@@ -68,6 +68,7 @@ print("finished M, cost: ", time.time() - t1, " s")
 
 all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
 for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
+    t1 = time.time()
     if file_cnt>MAX_RUN_FILE_NUM and MAX_RUN_FILE_NUM!=-1:
         break
     print(f"file: {pcd_file}")
@@ -79,11 +80,9 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts.matrix_order = (int)(RANGE / RESOLUTION)
     Qpts.calculate_query_matrix_start_id()
 
-    t1 = time.time()
     Qpts.generate_query_binary_tree(Mpts.minz_matrix)
     print(time.time() - t1)
     Qpts.get_binary_matrix()
-    print("finished Q, cost: ", time.time() - t1, " s")
 
     # pre-process
 
@@ -126,9 +125,10 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     # axs[0,1].set_title('Prior Map bin 2d')
     # axs[1,0].imshow(Qpts.SightMask, cmap='hot', interpolation='nearest')
     # axs[1,0].set_title('After RPG')
-    # axs[1,1].imshow(Qpts.RPGMask, cmap='hot', interpolation='nearest')
+    # axs[1,1].imshow(Mpts.minz_matrix, cmap='hot', interpolation='nearest')
     # axs[1,1].set_title('trigger')
     # plt.show()
+    print("finished Q, cost: ", time.time() - t1, " s")
 
     t = time.time()
     for (i,j) in list(zip(*np.where(trigger != 0))):

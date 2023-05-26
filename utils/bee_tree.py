@@ -19,7 +19,7 @@ from .pcdpy3 import load_pcd
 
 SIZE_OF_INT = 32 # 64
 MAX_OF_INT = 0xffffffff # 0xffffffffffffffff
-MIN_Z_RES = 0.2
+MIN_Z_RES = 0.1
 
 class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
     def __init__(self): 
@@ -220,7 +220,8 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             min_z = minz_matrix[self.start_id_x+idx][self.start_id_y+idy]
             self.root_matrix[idx][idy].min_z = min_z
             idz = np.divide(pts[...,2] - min_z, self.unit_z).astype(int)
-            self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
+            # self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
+            self.root_matrix[idx][idy].register_points(pts, idz, MIN_Z_RES, pts_id)
             self.pts_num_in_unit[idx][idy] = ie - ib
 
     def get_binary_matrix(self):
@@ -286,12 +287,13 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         r = self.matrix_order
         sight_mask = np.zeros((r, r), dtype=int)
         no_ground = self.binary_matrix & (-2) # -0xffff fffe
+        ground = self.binary_matrix & 1
         highest_bit = (np.log2(no_ground+1)).astype(int)
         for i, j in itertools.product(range(0, 0+r), range(0, 0+r)):
-            if highest_bit[i][j] > 0:
+            if ground[i][j] == 0:
+                sight_mask[i][j] = MAX_OF_INT
+            elif highest_bit[i][j] > 0:
                 sight_mask[i][j] = MAX_OF_INT-(2**highest_bit[i][j])+1
-                # print(f"idx:{i}, idy:{j}, b= {bin(no_ground[i][j])}, bdata:{bin(sight_mask[i][j])}")
-                # print(f"b= {bin(no_ground[i][j])}, s={bin(sight_mask[i][j])}")
         return sight_mask
 
     def calculate_map_roi(self, map_binary_matrix):
@@ -420,22 +422,18 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             for jj in range(Qpts.matrix_order):
                 j = jj + Qpts.start_id_y
                 cid = ground_index_matrix[ii][jj]
-                if cid < 0 or self.root_matrix[i][j] is None or self.root_matrix[i][j].children[cid] is None:
-                    continue
-                else: # if has ground 2-nd children
+                if cid >= 0 and self.root_matrix[i][j] is not None and self.root_matrix[i][j].children[cid] is not None:# if has ground 2-nd children
                     # print(str(i)+" "+str(j)+" "+str(bin(self.root_matrix[i][j].children[0].binary_data).zfill(32)))
                     all_pts_num = self.root_matrix[i][j].children[cid].pts_num
                     pts_num = 0
-                    next = False
+                    next_flag = False
                     for k in range(SIZE_OF_INT):
-                        if self.root_matrix[i][j].children[cid].children[k] is None:
-                            continue
-                        else:
+                        if self.root_matrix[i][j].children[cid].children[k] is not None:
                             pts_num += self.root_matrix[i][j].children[cid].children[k].pts_num
                             # print(i,j,pts_num,all_pts_num)
                             if pts_num *1.0 / all_pts_num >= 0.85:
-                                ground_mask[ii][jj] |= ((1 & next) << k)
-                                next = True
+                                ground_mask[ii][jj] |= ((1 & next_flag) << k) # 1 for triggered and 0 for protected
+                                next_flag = True
         return ground_mask
 
     @staticmethod
@@ -485,24 +483,24 @@ class BEENode:
         for i in range(SIZE_OF_INT):
             overheight_id = np.where(idz>=i)
             in_node_id = np.where(idz==i)
-            if (i == SIZE_OF_INT - 1 or i == SIZE_OF_INT) and overheight_id[0].size != 0:
-                new_idz = (np.divide(pts[overheight_id][...,2] - i * unit_z - self.min_z, hierarchical_unit_z)).astype(int)
+            if i == SIZE_OF_INT - 1 and overheight_id[0].size != 0:
+                # new_idz = (np.divide(pts[overheight_id][...,2] - i * unit_z - self.min_z, hierarchical_unit_z)).astype(int)
                 ii = SIZE_OF_INT - 2 # to protect SIZE_OF_INT - 1
-                self.children[ii] = BEENode()
-                self.children[ii].min_z = min(pts[overheight_id][...,2])
-                self.children[ii].register_points(pts[overheight_id], new_idz, hierarchical_unit_z, pts_id[overheight_id])
+                index = overheight_id
+                # self.children[ii] = BEENode()
+                # self.children[ii].min_z = min(pts[overheight_id][...,2])
+                # self.children[ii].register_points(pts[overheight_id], new_idz, hierarchical_unit_z, pts_id[overheight_id])
+                # self.children[ii].register_points(pts[overheight_id], new_idz, 0.0, pts_id[overheight_id])
             elif in_node_id[0].size == 0:
                 self.children[i] = None
                 continue
             else:
-                # if(unit_z == 0.5):
-                #     print(pts[in_node_id][...,2])
-                #     print(i)
                 ii = i
-                self.children[ii] = BEENode()
-                self.children[ii].min_z = min(pts[in_node_id][...,2])
-                new_idz = (np.divide(pts[in_node_id][...,2] - ii * unit_z - self.min_z, hierarchical_unit_z)).astype(int)
-                self.children[ii].register_points(pts[in_node_id], new_idz, hierarchical_unit_z, pts_id[in_node_id])
+                index = in_node_id
+            self.children[ii] = BEENode()
+            self.children[ii].min_z = min(pts[index][...,2])
+            new_idz = (np.divide(pts[in_node_id][...,2] - i * unit_z - self.min_z, hierarchical_unit_z)).astype(int)
+            self.children[ii].register_points(pts[index], new_idz, hierarchical_unit_z, pts_id[index])
             self.binary_data |= 1<<ii
         self.pts_id = pts_id
         self.pts_num = len(pts)
