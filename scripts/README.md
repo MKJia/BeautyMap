@@ -1,7 +1,22 @@
 Evaluation
 ---
 
+### Visualize
 
+```bash
+python3 scripts/view_res.py
+```
+
+- Blue: Static pts
+- Red: False positive
+- Orange: False negative
+- Yellow: True positive
+
+
+Image:
+![](../assets/view_res_demo.png)
+
+### Score
 Thins you need to change in `scripts/eval.py`:
 
 ```python

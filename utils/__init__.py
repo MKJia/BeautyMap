@@ -7,6 +7,13 @@
 import numpy as np
 import open3d as o3d
 from .o3d_view import ViewControl
+import os
+def check_file_exists(file_path):
+    if os.path.exists(file_path) is False:
+        print("No such file: ", file_path)
+        print("We must have this file to evaluate.")
+        print("Exit now... check your path.")
+        exit(0)
 
 def cnt_staticAdynamic(np_data : np.ndarray):
     dynamic_cnt = np.count_nonzero(np_data[:,3])
