@@ -42,6 +42,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.matrix_order = None
         self.start_id_x = 0
         self.start_id_y = 0
+        self.viewpoint_z = 0
 
         # tree structure
         self.root_matrix = None
@@ -260,6 +261,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
         self.non_negtive_points = np.asarray(self.o3d_original_points.points - coordinate_offset)
         self.non_negtive_center = self.sensor_origin_pose[:3] - coordinate_offset #self.non_negtive_points[0,:]
+        # tmp1 = self.non_negtive_points - self.non_negtive_center
+        # tmp2 = np.sqrt(tmp1[:,0] ** 2 + tmp1[:,1] ** 2)
+        # return max(tmp1[:,2]/tmp2) k=0.09923
 
     def smoother(self):
         m,n = len(self.pts_num_in_unit), len(self.pts_num_in_unit[0])
@@ -283,17 +287,23 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             range_mask[x][y] = 1
         return range_mask
     
-    def generate_sight_mask(self):
+    def generate_sight_mask(self, k, minz_matrix):
         r = self.matrix_order
         sight_mask = np.zeros((r, r), dtype=int)
         no_ground = self.binary_matrix & (-2) # -0xffff fffe
         ground = self.binary_matrix & 1
         highest_bit = (np.log2(no_ground+1)).astype(int)
+        self.viewpoint_z = (self.non_negtive_center[2] - minz_matrix[self.start_id_x+int(self.matrix_order/2)][self.start_id_y+int(self.matrix_order/2)]) / self.unit_z
+        print(f"sensor_h = {self.viewpoint_z}")
         for i, j in itertools.product(range(0, 0+r), range(0, 0+r)):
             if ground[i][j] == 0:
                 sight_mask[i][j] = MAX_OF_INT
             elif highest_bit[i][j] > 0:
-                sight_mask[i][j] = MAX_OF_INT-(2**highest_bit[i][j])+1
+                sight_mask[i][j] = MAX_OF_INT-2**highest_bit[i][j]+1
+            elif highest_bit[i][j] == 0:
+                highest_sight_bit = int(self.viewpoint_z + np.sqrt((r/2-i)**2+(r/2-j)**2) * k)
+                sight_mask[i][j] = MAX_OF_INT-2**highest_sight_bit+1
+                # print(f"s = {highest_sight_bit}, h={highest_bit[i][j]}, d = {np.sqrt((r/2-i)**2+(r/2-j)**2) * k}")
         return sight_mask
 
     def calculate_map_roi(self, map_binary_matrix):
@@ -411,7 +421,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                         else:
                             pts_num += self.root_matrix[i][j].children[0].children[k].pts_num
                             # print(i,j,pts_num,all_pts_num)
-                            if pts_num *1.0 / all_pts_num >= 0.95:
+                            if pts_num *1.0 / all_pts_num >= 0.954:
                                 ground_mask[i][j] |= (1 << k)
         return ground_mask
 
@@ -435,6 +445,52 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                                 ground_mask[ii][jj] |= ((1 & next_flag) << k) # 1 for triggered and 0 for protected
                                 next_flag = True
         return ground_mask
+
+    def ray_casting(self, trigger):
+        blocked_mask = np.zeros((self.matrix_order, self.matrix_order), dtype=int)
+        origin_x = origin_y = int(self.matrix_order / 2)
+        for i, j in itertools.product(range(self.matrix_order), range(self.matrix_order)):
+            if trigger[i][j] != 0:
+                direction_x = i - origin_x
+                direction_y = j - origin_y
+                if direction_x == 0 and direction_y != 0:
+                    step_x = 0
+                    step_y = direction_y / abs(direction_y)
+                elif direction_y == 0 and direction_x != 0:
+                    step_y = 0
+                    step_x = direction_x / abs(direction_x)
+                elif direction_x != 0 and direction_y != 0:
+                    sign_x = direction_x / abs(direction_x)
+                    sign_y = direction_y / abs(direction_y)
+                    if abs(direction_x) > abs(direction_y):
+                        step_y = sign_y * abs(direction_y / direction_x)
+                        step_x = sign_x
+                    else: #if abs(direction_x) <= abs(direction_y):
+                        step_x = sign_x * abs(direction_x / direction_y)
+                        step_y = sign_y
+                else:
+                    continue
+
+                z_list = self.binTo3id(trigger[i][j])
+                current_x = origin_x + step_x
+                current_y = origin_y + step_y
+                ds = np.sqrt(step_x**2+step_y**2)
+                s = np.sqrt(direction_x**2+direction_y**2)
+                step_z = 0
+                while 0 < current_x < self.matrix_order and 0 < current_y < self.matrix_order:
+                    step_z += ds
+                    current_z = [int(((z - self.viewpoint_z) * step_z / s)+self.viewpoint_z) for z in z_list]
+                    current_occupied_list = self.binTo3id(self.binary_matrix[int(current_x)][int(current_y)])
+                    blocked_index = [index for index, num in enumerate(current_z) if num in current_occupied_list] # index is same as z_list
+                    for id in blocked_index:
+                        blocked_mask[i][j] |= (1 << z_list[id])
+                    # print(f"cx = {current_x}, cy = {current_y}, cz = {current_z}, cb = {current_occupied_list}")
+                    if abs(current_x - i) <= 1 and abs(current_y - j) <= 1:
+                        break
+                    current_x += step_x
+                    current_y += step_y
+                # print(f"i = {i}, j = {j}, bm = {bin(blocked_mask[i][j])}")
+        return blocked_mask
 
     @staticmethod
     def binTo3id(t):

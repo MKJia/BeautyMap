@@ -35,7 +35,7 @@ H_RES = 0.5 # m, resolution default 1m
 RANGE_16_RING = 8
 GROUND_THICK = 0.5
 # DATA_FOLDER = f"{BASE_DIR}/data/three_people_behind"
-DATA_FOLDER = f"/home/ubuntu/repositories/edo_ws/edomap/data/KITTI/00"
+DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap/data/KITTI/00/"
 MAX_RUN_FILE_NUM = -1 # -1 for all files
 
 print(f"We will process the data in folder: {bc.BOLD}{DATA_FOLDER}{bc.ENDC}")
@@ -65,6 +65,7 @@ Mpts.get_minz_matrix()
 print("finished M, cost: ", time.time() - t1, " s")
 # view_pts = Mpts.view_tree(ijh_index, 1)
 # o3d.visualization.draw_geometries([view_pts])
+k = 0.09923 * RESOLUTION / H_RES
 
 all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
 for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
@@ -92,7 +93,7 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
 
     # DEAR
     # Qpts.RangeMask = Qpts.generate_range_mask(40)#int(RANGE_16_RING/RESOLUTION))
-    Qpts.SightMask = Qpts.generate_sight_mask()
+    Qpts.SightMask = Qpts.generate_sight_mask(k, Mpts.minz_matrix)
     # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
 
     map_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.binary_matrix)
@@ -103,6 +104,8 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     # trigger &= ~(Qpts.RangeMask - 1)
     trigger &= ~Qpts.SightMask
     trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi) # Remove the lowest of the trigger, which is further calculated in LOGIC
+    blocked_mask = Qpts.ray_casting(trigger)
+    trigger &= ~blocked_mask
     # print(Qpts.binary_2d)
     # for i, j in itertools.product(range(0, 0+Qpts.matrix_order), range(0, 0+Qpts.matrix_order)):
     #     if trigger[i][j] != 0:
@@ -123,12 +126,15 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     # axs[0,0].set_title('Query 2d')
     # axs[0,1].imshow(np.log2(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
     # axs[0,1].set_title('Prior Map bin 2d')
-    # axs[1,0].imshow(Qpts.SightMask, cmap='hot', interpolation='nearest')
+    # axs[1,0].imshow(np.log2(trigger), cmap='hot', interpolation='nearest')
     # axs[1,0].set_title('After RPG')
-    # axs[1,1].imshow(Mpts.minz_matrix, cmap='hot', interpolation='nearest')
+    # axs[1,1].imshow(np.log2(blocked_mask), cmap='hot', interpolation='nearest')
     # axs[1,1].set_title('trigger')
     # plt.show()
     print("finished Q, cost: ", time.time() - t1, " s")
+
+
+
 
     t = time.time()
     for (i,j) in list(zip(*np.where(trigger != 0))):
@@ -159,7 +165,7 @@ oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, inv
 save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points)) # static map
 
 # save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points))
-# save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))
+save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))
 # print(f"Saved {len(oulier_cloud.points)} data points to edomap_output.pcd.")
 # Mpts.view_compare(inlier_cloud, oulier_cloud)
 
