@@ -10,6 +10,7 @@
 # math
 import numpy as np
 np.seterr(divide='ignore', invalid='ignore')
+np.set_printoptions(threshold=np.inf)
 
 from tqdm import tqdm
 import sys, os
@@ -65,10 +66,11 @@ Mpts.get_minz_matrix()
 print("finished M, cost: ", time.time() - t1, " s")
 # view_pts = Mpts.view_tree(ijh_index, 1)
 # o3d.visualization.draw_geometries([view_pts])
-k = 0.09923 * RESOLUTION / H_RES
 
 all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
 for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
+    # if file_cnt < 47:
+    #     continue
     t1 = time.time()
     if file_cnt>MAX_RUN_FILE_NUM and MAX_RUN_FILE_NUM!=-1:
         break
@@ -76,7 +78,9 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts = BEETree()
     Qpts.set_points_from_file(f"{DATA_FOLDER}/pcd/{pcd_file}")
     Qpts.set_unit_params(RESOLUTION, RESOLUTION, H_RES)
-    Qpts.transform_on_points(Mpts.coordinate_offset)
+    k = Qpts.transform_on_points(Mpts.coordinate_offset)  * RESOLUTION / H_RES
+    # k=0.09923*2
+    print(f"k = {k}")
 
     Qpts.matrix_order = (int)(RANGE / RESOLUTION)
     Qpts.calculate_query_matrix_start_id()
@@ -87,24 +91,29 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
 
     # pre-process
 
+    map_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.binary_matrix)
+    minz_matrix_roi = Qpts.calculate_map_roi(Mpts.minz_matrix)
+    outlier_matrix_roi = Qpts.calculate_map_roi(Mpts.outlier_matrix)
     # RPG
-    Qpts.RPGMat = Qpts.smoother()
-    Qpts.RPGMask = Qpts.RPGMat > 0#(RESOLUTION * RANGE)**2
+    # Qpts.RPGMat = Qpts.smoother()
+    # Qpts.RPGMask = Qpts.RPGMat > 0#(RESOLUTION * RANGE)**2
 
     # DEAR
     # Qpts.RangeMask = Qpts.generate_range_mask(40)#int(RANGE_16_RING/RESOLUTION))
-    Qpts.SightMask = Qpts.generate_sight_mask(k, Mpts.minz_matrix)
+    Qpts.SightMask = Qpts.generate_sight_mask(k, minz_matrix_roi, outlier_matrix_roi)
     # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
 
-    map_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.binary_matrix)
     binary_xor = (~Qpts.binary_matrix) & map_binary_matrix_roi
     trigger = binary_xor #(~Qpts.binary_matrix) & binary_xor
+    # print(binary_xor)
+    # print(map_binary_matrix_roi)
+    # print(Qpts.binary_matrix)
 
-    trigger &= ~(Qpts.RPGMask - 1) # ~(x-1) is to swap 0x0 and 0xfffffffffffff
+    # trigger &= ~(Qpts.RPGMask - 1) # ~(x-1) is to swap 0x1 and 0xfffffffffffff
     # trigger &= ~(Qpts.RangeMask - 1)
     trigger &= ~Qpts.SightMask
     trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi) # Remove the lowest of the trigger, which is further calculated in LOGIC
-    blocked_mask = Qpts.ray_casting(trigger)
+    blocked_mask = Qpts.ray_casting(trigger, minz_matrix_roi)
     trigger &= ~blocked_mask
     # print(Qpts.binary_2d)
     # for i, j in itertools.product(range(0, 0+Qpts.matrix_order), range(0, 0+Qpts.matrix_order)):
@@ -117,10 +126,6 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     # map_ground_mask_roi = Qpts.calculate_map_roi(ground_mask)
     # Mpts.get_ground_hierachical_binary_matrix(ground_index_matrix)
 
-    # for i in range(len(map_ground_binary_matrix_roi)):
-    #     print("================================================================")
-    #     for j in range(len(map_ground_binary_matrix_roi[0])):
-    #         print(bin(map_ground_binary_matrix_roi[i][j]).zfill(32))
     # fig, axs = plt.subplots(2, 2, figsize=(8,8))
     # axs[0,0].imshow(np.log2(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
     # axs[0,0].set_title('Query 2d')
@@ -128,7 +133,7 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     # axs[0,1].set_title('Prior Map bin 2d')
     # axs[1,0].imshow(np.log2(trigger), cmap='hot', interpolation='nearest')
     # axs[1,0].set_title('After RPG')
-    # axs[1,1].imshow(np.log2(blocked_mask), cmap='hot', interpolation='nearest')
+    # axs[1,1].imshow(Mpts.minz_matrix, cmap='hot', interpolation='nearest')
     # axs[1,1].set_title('trigger')
     # plt.show()
     print("finished Q, cost: ", time.time() - t1, " s")
