@@ -33,15 +33,12 @@ starttime = time.time()
 RANGE = 40 # m, from cetner point to an square
 RESOLUTION = 1 # m, resolution default 1m
 H_RES = 0.5 # m, resolution default 1m
-RANGE_16_RING = 8
-GROUND_THICK = 0.5
-# DATA_FOLDER = f"{BASE_DIR}/data/three_people_behind"
-DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap/data/KITTI/00/"
+
+DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap/data/KITTI/01/"
 MAX_RUN_FILE_NUM = -1 # -1 for all files
 
 print(f"We will process the data in folder: {bc.BOLD}{DATA_FOLDER}{bc.ENDC}")
 points_index2Remove = []
-# points_ground2Protect = []
 
 # read raw map or gt cloud
 raw_map_path = f"{DATA_FOLDER}/raw_map.pcd"
@@ -58,19 +55,12 @@ Mpts.generate_map_binary_tree()
 print("Generate binary tree in Map cost: ",time.time() - t1, " s")
 Mpts.get_binary_matrix()
 Mpts.get_minz_matrix()
-# ijh_index = np.log2((Mpts.binary_matrix & -Mpts.binary_matrix)).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
-# Mpts.get_ground_hierachical_binary_matrix(ijh_index) # for i,j in matrix, we extract the ground hierachical in the h_th height
-# points_ground2Protect = Mpts.get_ground_points_id(ijh_index)
-# ground_mask = Mpts.calculate_ground_distribution_mask()
 
 print("finished M, cost: ", time.time() - t1, " s")
-# view_pts = Mpts.view_tree(ijh_index, 1)
-# o3d.visualization.draw_geometries([view_pts])
 
 all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
+
 for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
-    # if file_cnt < 47:
-    #     continue
     t1 = time.time()
     if file_cnt>MAX_RUN_FILE_NUM and MAX_RUN_FILE_NUM!=-1:
         break
@@ -79,8 +69,6 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts.set_points_from_file(f"{DATA_FOLDER}/pcd/{pcd_file}")
     Qpts.set_unit_params(RESOLUTION, RESOLUTION, H_RES)
     k = Qpts.transform_on_points(Mpts.coordinate_offset)  * RESOLUTION / H_RES
-    # k=0.09923*2
-    print(f"k = {k}")
 
     Qpts.matrix_order = (int)(RANGE / RESOLUTION)
     Qpts.calculate_query_matrix_start_id()
@@ -90,58 +78,30 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts.get_binary_matrix()
 
     # pre-process
-
     map_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.binary_matrix)
     minz_matrix_roi = Qpts.calculate_map_roi(Mpts.minz_matrix)
     outlier_matrix_roi = Qpts.calculate_map_roi(Mpts.outlier_matrix)
-    # RPG
-    # Qpts.RPGMat = Qpts.smoother()
-    # Qpts.RPGMask = Qpts.RPGMat > 0#(RESOLUTION * RANGE)**2
-
-    # DEAR
-    # Qpts.RangeMask = Qpts.generate_range_mask(40)#int(RANGE_16_RING/RESOLUTION))
-    Qpts.SightMask = Qpts.generate_sight_mask(k, minz_matrix_roi, outlier_matrix_roi)
-    # Qpts.DEARMask = Qpts.RangeMask & Qpts.SightMask
 
     binary_xor = (~Qpts.binary_matrix) & map_binary_matrix_roi
-    trigger = binary_xor #(~Qpts.binary_matrix) & binary_xor
-    # print(binary_xor)
-    # print(map_binary_matrix_roi)
-    # print(Qpts.binary_matrix)
+    trigger = binary_xor
 
-    # trigger &= ~(Qpts.RPGMask - 1) # ~(x-1) is to swap 0x1 and 0xfffffffffffff
-    # trigger &= ~(Qpts.RangeMask - 1)
-    trigger &= ~Qpts.SightMask
+    # BGM
+    Qpts.BlindGridMask = Qpts.generate_blind_grid_mask()
+    # SRM
+    Qpts.SightRangeMask = Qpts.generate_sight_range_mask(k, minz_matrix_roi, outlier_matrix_roi)
+
+    trigger &= ~Qpts.SightRangeMask
+    trigger &= ~(Qpts.BlindGridMask - 1)
     trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi) # Remove the lowest of the trigger, which is further calculated in LOGIC
-    blocked_mask = Qpts.ray_casting(trigger, minz_matrix_roi)
+    # RV ray casting
+    blocked_mask = Qpts.reverse_virtural_ray_casting(trigger, minz_matrix_roi)
     trigger &= ~blocked_mask
-    # print(Qpts.binary_2d)
-    # for i, j in itertools.product(range(0, 0+Qpts.matrix_order), range(0, 0+Qpts.matrix_order)):
-    #     if trigger[i][j] != 0:
-    #         print(f"idx:{i}, idy:{j}, bdata:{bin(trigger[i][j])}")
 
-    ground_index_matrix = np.log2((trigger & -trigger) >> 1).astype(int) #* (2**int(GROUND_THICK/H_RES+2)-1)
+    ground_index_matrix = np.log2((trigger & -trigger) >> 1).astype(int)
     ground_trigger = Mpts.calculate_ground_mask(Qpts, ground_index_matrix)
-    # map_ground_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.ground_binary_matrix)
-    # map_ground_mask_roi = Qpts.calculate_map_roi(ground_mask)
-    # Mpts.get_ground_hierachical_binary_matrix(ground_index_matrix)
 
-    # fig, axs = plt.subplots(2, 2, figsize=(8,8))
-    # axs[0,0].imshow(np.log2(Qpts.binary_matrix), cmap='hot', interpolation='nearest')
-    # axs[0,0].set_title('Query 2d')
-    # axs[0,1].imshow(np.log2(map_binary_matrix_roi), cmap='hot', interpolation='nearest')
-    # axs[0,1].set_title('Prior Map bin 2d')
-    # axs[1,0].imshow(np.log2(trigger), cmap='hot', interpolation='nearest')
-    # axs[1,0].set_title('After RPG')
-    # axs[1,1].imshow(Mpts.minz_matrix, cmap='hot', interpolation='nearest')
-    # axs[1,1].set_title('trigger')
-    # plt.show()
     print("finished Q, cost: ", time.time() - t1, " s")
 
-
-
-
-    t = time.time()
     for (i,j) in list(zip(*np.where(trigger != 0))):
         z = Mpts.binTo3id(trigger[i][j])
         for idz in z:
@@ -149,7 +109,6 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
         gz = Mpts.binTo3id(ground_trigger[i][j])
         for idgz in gz:
             points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[ground_index_matrix[i][j]].children[idgz].pts_id).tolist()
-    print(time.time() - t)
 
 print(f"There are {len(points_index2Remove)} pts to remove")
 
@@ -161,26 +120,8 @@ print(f" running time: {time.time() - starttime}")
 inlier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove)
 oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, invert=True)
 
-# outliers = np.array(oulier_cloud.points)
-# inliers = np.array(inlier_cloud.points)
-
-# outliers = np.c_[outliers, np.zeros((outliers.shape[0], 1))]
-# inliers = np.c_[inliers, np.ones((inliers.shape[0], 1))]
-# combined = np.concatenate((outliers, inliers), axis=0)
 save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points)) # static map
 
-# save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points))
 save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))
-# print(f"Saved {len(oulier_cloud.points)} data points to edomap_output.pcd.")
-# Mpts.view_compare(inlier_cloud, oulier_cloud)
-
-# fig, axs = plt.subplots(2, 2, figsize=(8,8))
-# axs[0,0].imshow(Qpts.binary_2d, cmap='hot', interpolation='nearest')
-# axs[0,0].set_title('Query 2d')
-# axs[0,1].imshow(Mpts.binary_2d, cmap='hot', interpolation='nearest')
-# axs[0,1].set_title('Prior Map bin 2d')
-# axs[1,0].imshow(trigger, cmap='hot', interpolation='nearest')
-# axs[1,0].set_title('After xor')
-# plt.show()
 
 print(f"{os.path.basename( __file__ )}: All codes run successfully, Close now..")
