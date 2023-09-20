@@ -16,6 +16,21 @@ python3 scripts/view_res.py
 Image:
 ![](../assets/view_res_demo.png)
 
+#### Export Paper Figure
+
+Check the `view` folder for these
+
+1. Need manual save a camera viewpoint, open with window and move mouse to select a good view, then press `p` to save the camera position with `.txt` file.
+    ```bash
+    python3 scripts/view/save_camera_pos.py
+    ```
+2. Open the [view/view_res.ipynb](view/view_res.ipynb) to generate the figures
+
+3. Demo of export figure:
+   ![](../assets/view_total.png)
+
+
+
 ### Score
 Thins you need to change in `scripts/eval.py`:
 
