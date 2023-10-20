@@ -63,10 +63,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         PointCloudData = load_pcd(filename) # x, y, z, qw, qx, qy, qz
         self.sensor_origin_pose = np.array(list(PointCloudData.get_metadata()['viewpoint']))
         self.original_points = PointCloudData.np_data
-        self.o3d_original_points = o3d.geometry.PointCloud()
-        self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
-        self.original_points = np.asarray(self.o3d_original_points.points)
-        self.center = np.mean(self.original_points,axis=0)
+        self.center = np.mean(self.original_points[:,:3],axis=0)
         self.start_xy = np.array([.0,.0]) # Only for map, once
         print(f"Number of points: {self.original_points.shape}")
 
@@ -163,8 +160,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         """Generates a simple binary tree
         """
         points_in_map_frame = self.non_negtive_points - [self.start_xy[0], self.start_xy[1], 0]
-        idxyz = (np.divide(points_in_map_frame,[self.unit_x, self.unit_y, self.unit_z])).astype(int)[:,:3]
-
+        points_in_range_id = (points_in_map_frame[:, 0] >= 0) & (points_in_map_frame[:, 1] >= 0) & (points_in_map_frame[:, 0] < self.matrix_order*self.unit_x) & (points_in_map_frame[:, 1] < self.matrix_order*self.unit_y)
+        points_in_range = points_in_map_frame[points_in_range_id]
+        idxyz = (np.divide(points_in_range,[self.unit_x, self.unit_y, self.unit_z])).astype(int)[:,:3]
         ori_id = np.lexsort([idxyz[:,2], idxyz[:,1], idxyz[:,0]])
         newidxyz = idxyz[ori_id]
 
@@ -173,9 +171,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
 
         id_begin = np.array([],dtype=int)
         id_end = np.array([],dtype=int)
-        t = time.time()
         id_begin = [i for i, v in enumerate(newidxyz) if i == 0 or (v[0] != newidxyz[i-1][0] or v[1] != newidxyz[i-1][1])]
-        print(time.time()-t)
         id_end = copy.deepcopy(id_begin)
         id_end.remove(0)
         id_end.append(len(newidxyz))
@@ -184,16 +180,38 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             ie = id_end[iid]
             idx = newidxyz[ib][0]
             idy = newidxyz[ib][1]
-            if idx < 0 or idy < 0 or idx >= self.matrix_order or idy >= self.matrix_order:
-                continue
             pts_id = ori_id[ib:ie]
-            pts = points_in_map_frame[pts_id]
+            pts = points_in_range[pts_id]
             self.root_matrix[idx][idy] = BEENode()
             self.root_matrix[idx][idy].min_z = min(pts[...,2])
             min_z = minz_matrix[self.start_id_x+idx][self.start_id_y+idy]
             self.root_matrix[idx][idy].min_z = min_z
             idz = np.divide(pts[...,2] - min_z, self.unit_z).astype(int)
-            self.root_matrix[idx][idy].register_points(pts, idz, MIN_Z_RES, pts_id)
+            overheight_id = np.where(idz >= SIZE_OF_INT-1)
+            self.root_matrix[idx][idy].children = np.empty(SIZE_OF_INT, dtype=object)
+            for i in range(SIZE_OF_INT - 1):
+                in_node_id = np.where(idz==i)
+                if in_node_id[0].size == 0:
+                    self.root_matrix[idx][idy].children[i] = None
+                    continue
+                else:
+                    index = in_node_id
+                self.root_matrix[idx][idy].children[i] = BEENode() # default BEENode.children = None
+                # self.root_matrix[idx][idy].children[i].min_z = min(pts[index][...,2])
+                self.root_matrix[idx][idy].children[i].pts_id = pts[index]
+                self.root_matrix[idx][idy].children[i].pts_num = len(index)
+                self.root_matrix[idx][idy].binary_data |= 1 << i
+
+            if overheight_id[0].size != 0:
+                index = overheight_id
+                i = SIZE_OF_INT - 2
+                self.root_matrix[idx][idy].children[i] = BEENode() # default BEENode.children = None
+                # self.root_matrix[idx][idy].children[i].min_z = min(pts[index][...,2])
+                self.root_matrix[idx][idy].children[i].pts_id = pts[index]
+                self.root_matrix[idx][idy].children[i].pts_num = len(index)
+                self.root_matrix[idx][idy].binary_data |= 1 << i
+            self.root_matrix[idx][idy].pts_id = pts_id
+            self.root_matrix[idx][idy].pts_num = len(pts)
             self.pts_num_in_unit[idx][idy] = ie - ib
 
     def get_binary_matrix(self):
@@ -213,8 +231,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                     self.minz_matrix[i][j] = self.root_matrix[i][j].min_z
 
     def transform_on_points(self, coordinate_offset):
-        self.o3d_original_points.points = o3d.utility.Vector3dVector(self.original_points[:,:3])
-        self.non_negtive_points = np.asarray(self.o3d_original_points.points - coordinate_offset)
+        self.non_negtive_points = np.asarray(self.original_points[:,:3] - coordinate_offset)
         self.non_negtive_center = self.sensor_origin_pose[:3] - coordinate_offset
         tmp1 = self.non_negtive_points - self.non_negtive_center
         tmp2 = np.sqrt(tmp1[:,0] ** 2 + tmp1[:,1] ** 2)
@@ -228,7 +245,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         highest_bit = (np.log2(no_ground+1)).astype(int)
         self.viewpoint_z = (self.non_negtive_center[2] - minz_matrix[int(self.matrix_order/2)][int(self.matrix_order/2)]) / self.unit_z + 0.5
         for i, j in itertools.product(range(0, 0+r), range(0, 0+r)):
-            highest_sight_bit = int(self.viewpoint_z + np.sqrt((r/2-i)**2+(r/2-j)**2) * k + 0.5)
+            highest_sight_bit = min(SIZE_OF_INT-1, int(self.viewpoint_z + np.sqrt((r/2-i)**2+(r/2-j)**2) * k + 0.5))
             if ground[i][j] == 0 and (i - r/2)**2 + (j - r/2)**2 >= (RANGE_OF_SIGHT / self.unit_y)**2:
                 sight_mask[i][j] = MAX_OF_INT
             elif highest_bit[i][j] > 0 and outlier_matrix[i][j] == 0:
@@ -274,7 +291,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                                 next_flag = True
         return ground_mask
 
-    def reverse_virtural_ray_casting(self, trigger, minz_matrix):
+    def reverse_virtual_ray_casting(self, trigger, minz_matrix):
         blocked_mask = np.zeros((self.matrix_order, self.matrix_order), dtype=int)
         origin_x = origin_y = int(self.matrix_order / 2)
         for i, j in itertools.product(range(self.matrix_order), range(self.matrix_order)):
@@ -336,7 +353,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
 class BEENode:
     def __init__(self):
         self.binary_data = 0 # int64
-        self.children = np.empty(SIZE_OF_INT, dtype=object) # ndarray(BEENode)[63]
+        self.children = None # np.empty(SIZE_OF_INT, dtype=object) # ndarray(BEENode)[63]
         self.pts_id = None
         self.pts_num = None
         self.min_z = float("inf")
@@ -359,8 +376,10 @@ class BEENode:
         """
         if unit_z > MIN_Z_RES:
             hierarchical_unit_z = max(MIN_Z_RES, unit_z / (SIZE_OF_INT-1))
+            self.children = np.empty(SIZE_OF_INT, dtype=object)
         elif unit_z == MIN_Z_RES:
             hierarchical_unit_z = 0.0
+            self.children = np.empty(SIZE_OF_INT, dtype=object)
         else:
             self.children = None
             self.pts_id = pts_id

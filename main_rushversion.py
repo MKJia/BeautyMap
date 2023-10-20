@@ -29,12 +29,13 @@ from utils.pcdpy3 import save_pcd
 import itertools
 
 starttime = time.time()
+t_list = []
 
 RANGE = 40 # m, from cetner point to an square
 RESOLUTION = 1 # m, resolution default 1m
 H_RES = 0.5 # m, resolution default 1m
 
-DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap/data/KITTI/01/"
+DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/KITTI/01"
 MAX_RUN_FILE_NUM = -1 # -1 for all files
 
 print(f"We will process the data in folder: {bc.BOLD}{DATA_FOLDER}{bc.ENDC}")
@@ -61,10 +62,9 @@ print("finished M, cost: ", time.time() - t1, " s")
 all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
 
 for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
-    t1 = time.time()
     if file_cnt>MAX_RUN_FILE_NUM and MAX_RUN_FILE_NUM!=-1:
         break
-    print(f"file: {pcd_file}")
+    t1 = time.time()
     Qpts = BEETree()
     Qpts.set_points_from_file(f"{DATA_FOLDER}/pcd/{pcd_file}")
     Qpts.set_unit_params(RESOLUTION, RESOLUTION, H_RES)
@@ -74,7 +74,6 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts.calculate_query_matrix_start_id()
 
     Qpts.generate_query_binary_tree(Mpts.minz_matrix)
-    print(time.time() - t1)
     Qpts.get_binary_matrix()
 
     # pre-process
@@ -89,19 +88,15 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts.BlindGridMask = Qpts.generate_blind_grid_mask()
     # SRM
     Qpts.SightRangeMask = Qpts.generate_sight_range_mask(k, minz_matrix_roi, outlier_matrix_roi)
-
     trigger &= ~Qpts.SightRangeMask
     trigger &= ~(Qpts.BlindGridMask - 1)
     trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi) # Remove the lowest of the trigger, which is further calculated in LOGIC
     # RV ray casting
-    blocked_mask = Qpts.reverse_virtural_ray_casting(trigger, minz_matrix_roi)
+    blocked_mask = Qpts.reverse_virtual_ray_casting(trigger, minz_matrix_roi)
     trigger &= ~blocked_mask
 
     ground_index_matrix = np.log2((trigger & -trigger) >> 1).astype(int)
     ground_trigger = Mpts.calculate_ground_mask(Qpts, ground_index_matrix)
-
-    print("finished Q, cost: ", time.time() - t1, " s")
-
     for (i,j) in list(zip(*np.where(trigger != 0))):
         z = Mpts.binTo3id(trigger[i][j])
         for idz in z:
@@ -110,18 +105,28 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
         for idgz in gz:
             points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[ground_index_matrix[i][j]].children[idgz].pts_id).tolist()
 
+    t_tmp = time.time() - t1
+    print("finished Q, cost: ", t_tmp, " s")
+    t_list.append(t_tmp)
+
+mean_t = sum(t_list) / len(t_list)
+np_t_list = np.array(t_list)
+dev_t = np.std(np_t_list)
+print("frame time: ", mean_t , "range: ", dev_t)
+
 print(f"There are {len(points_index2Remove)} pts to remove")
 
 visited = set()
 dup_index2Remove = list({x for x in points_index2Remove if x in visited or (visited.add(x) or False)})
 print(f"There are {len(dup_index2Remove)} pts to remove now")
 print(f" running time: {time.time() - starttime}")
+points_index2Retain =np.setdiff1d(np.arange(len(Mpts.original_points)), points_index2Remove)
+outlier_cloud = Mpts.original_points[points_index2Retain]
+# inlier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove)
+# oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, invert=True)
 
-inlier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove)
-oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, invert=True)
+save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", outlier_cloud) # static map
 
-save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", np.array(oulier_cloud.points)) # static map
-
-save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))
+# save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))
 
 print(f"{os.path.basename( __file__ )}: All codes run successfully, Close now..")
