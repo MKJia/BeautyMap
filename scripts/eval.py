@@ -7,9 +7,12 @@ sys.path.append(BASE_DIR)
 from utils.pcdpy3 import load_pcd
 from utils import cnt_staticAdynamic
 
-DATA_FOLDER = "/home/kin/workspace/DUFOMap/data/"
-METHODS_NAME = "edomap"
-SEQUENCE_SELECT = ["00"]
+DATA_FOLDER = "/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/KITTI"
+METHODS_NAME = "beautymap"
+SEQUENCE_SELECT = ["05"]
+# DATA_FOLDER = "/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/cones_two_people"
+# METHODS_NAME = "beautymap"
+# SEQUENCE_SELECT = [""]
 
 # Step 1: Read your existing csv file
 with open(f'{BASE_DIR}/scripts/benchmark_results.csv', 'r') as file:

@@ -385,18 +385,24 @@ class BEENode:
             self.pts_id = pts_id
             self.pts_num = len(pts)
             return 0
+        in_ground_flag = False
         for i in range(SIZE_OF_INT):
             overheight_id = np.where(idz>=i)
             in_node_id = np.where(idz==i)
+            upper_node_id = np.where(idz==i+1)
             if i == SIZE_OF_INT - 1 and overheight_id[0].size != 0:
                 ii = SIZE_OF_INT - 2 # to protect SIZE_OF_INT - 1
                 index = overheight_id
             elif in_node_id[0].size == 0:
                 self.children[i] = None
-                continue
+                if(in_ground_flag and upper_node_id[0].size == 0):
+                    break
+                else:
+                    continue
             else:
                 ii = i
                 index = in_node_id
+                in_ground_flag = True
             self.children[ii] = BEENode()
             self.children[ii].min_z = min(pts[index][...,2])
             new_idz = (np.divide(pts[in_node_id][...,2] - i * unit_z - self.min_z, hierarchical_unit_z)).astype(int)

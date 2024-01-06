@@ -33,11 +33,17 @@ import itertools
 starttime = time.time()
 t_list = []
 
+# RANGE = 10 # m, from cetner point to an square
+# RESOLUTION = 0.5 # m, resolution default 1m
+# H_RES = 0.2 # m, resolution default 1m
+
+# DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/cones_two_people"
+
 RANGE = 40 # m, from cetner point to an square
 RESOLUTION = 1 # m, resolution default 1m
 H_RES = 0.5 # m, resolution default 1m
 
-DATA_FOLDER = f"/home/kin/code_online/edomap/data/KITTI/01/"
+DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/KITTI/00"
 MAX_RUN_FILE_NUM = -1 # -1 for all files
 
 timer = dztimer.Timing()
