@@ -16,6 +16,7 @@ from collections import defaultdict
 import copy
 from . import load_view_point
 from .pcdpy3 import load_pcd
+from tqdm import tqdm
 
 SIZE_OF_INT = 32 # 64
 MAX_OF_INT = 0xffffffff # 0xffffffffffffffff
@@ -112,12 +113,18 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
 
         id_begin = np.array([],dtype=int)
         id_end = np.array([],dtype=int)
-        id_begin = [i for i, v in enumerate(newidxyz) if i == 0 or (v[0] != newidxyz[i-1][0] or v[1] != newidxyz[i-1][1])]
+
+        # id_begin = [i for i, v in enumerate(newidxyz) if i == 0 or (v[0] != newidxyz[i-1][0] or v[1] != newidxyz[i-1][1])]
+        x_diff = newidxyz[1:, 0] != newidxyz[:-1, 0]
+        y_diff = newidxyz[1:, 1] != newidxyz[:-1, 1]
+        id_begin = (np.flatnonzero(x_diff | y_diff) + 1 ).tolist()
+        id_begin.insert(0, 0)
+
         id_end = copy.deepcopy(id_begin)
         id_end.remove(0)
         id_end.append(len(newidxyz))
 
-        for iid in range(len(id_begin)):
+        for iid in tqdm(range(len(id_begin))):
             ib = id_begin[iid]
             ie = id_end[iid]
             idx = newidxyz[ib][0]
@@ -156,63 +163,62 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             min_z_list = []
         return np.asarray(min_z_list)
 
-    def generate_query_binary_tree(self, minz_matrix):
+    def generate_query_binary_tree(self, minz_matrix_ori):
         """Generates a simple binary tree
         """
         points_in_map_frame = self.non_negtive_points - [self.start_xy[0], self.start_xy[1], 0]
         points_in_range_id = (points_in_map_frame[:, 0] >= 0) & (points_in_map_frame[:, 1] >= 0) & (points_in_map_frame[:, 0] < self.matrix_order*self.unit_x) & (points_in_map_frame[:, 1] < self.matrix_order*self.unit_y)
         points_in_range = points_in_map_frame[points_in_range_id]
-        idxyz = (np.divide(points_in_range,[self.unit_x, self.unit_y, self.unit_z])).astype(int)[:,:3]
-        ori_id = np.lexsort([idxyz[:,2], idxyz[:,1], idxyz[:,0]])
-        newidxyz = idxyz[ori_id]
+        idxy = (np.divide(points_in_range,[self.unit_x, self.unit_y, self.unit_z])).astype(int)[:,:2]
+        ori_id = np.lexsort([idxy[:,1], idxy[:,0]])
+        newidxy = idxy[ori_id]
 
         self.root_matrix = np.empty([self.matrix_order, self.matrix_order], dtype=object)
-        self.pts_num_in_unit = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
+        # self.pts_num_in_unit = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
 
         id_begin = np.array([],dtype=int)
         id_end = np.array([],dtype=int)
-        id_begin = [i for i, v in enumerate(newidxyz) if i == 0 or (v[0] != newidxyz[i-1][0] or v[1] != newidxyz[i-1][1])]
+        x_diff = newidxy[1:, 0] != newidxy[:-1, 0]
+        y_diff = newidxy[1:, 1] != newidxy[:-1, 1]
+        id_begin = (np.flatnonzero(x_diff | y_diff) + 1 ).tolist()
+        id_begin.insert(0, 0)
+
+        # id_begin = [i for i, v in enumerate(newidxy) if i == 0 or (v[0] != newidxy[i-1][0] or v[1] != newidxy[i-1][1])]
         id_end = copy.deepcopy(id_begin)
         id_end.remove(0)
-        id_end.append(len(newidxyz))
+        id_end.append(len(newidxy))
+        t2 = []
+        ib = []
+        ie = []
+        idx = None
+        idy = None
+        pts_id = None
+        pts = None
+        idz = None
+        overheight_index_search = None
+        exists_overheight = None
+        idz_sorted = None
+        filtered_array_search = None
+
         for iid in range(len(id_begin)):
             ib = id_begin[iid]
             ie = id_end[iid]
-            idx = newidxyz[ib][0]
-            idy = newidxyz[ib][1]
+            idx = newidxy[ib][0]
+            idy = newidxy[ib][1]
             pts_id = ori_id[ib:ie]
             pts = points_in_range[pts_id]
             self.root_matrix[idx][idy] = BEENode()
-            self.root_matrix[idx][idy].min_z = min(pts[...,2])
-            min_z = minz_matrix[self.start_id_x+idx][self.start_id_y+idy]
-            self.root_matrix[idx][idy].min_z = min_z
-            idz = np.divide(pts[...,2] - min_z, self.unit_z).astype(int)
-            overheight_id = np.where(idz >= SIZE_OF_INT-1)
-            self.root_matrix[idx][idy].children = np.empty(SIZE_OF_INT, dtype=object)
-            for i in range(SIZE_OF_INT - 1):
-                in_node_id = np.where(idz==i)
-                if in_node_id[0].size == 0:
-                    self.root_matrix[idx][idy].children[i] = None
-                    continue
-                else:
-                    index = in_node_id
-                self.root_matrix[idx][idy].children[i] = BEENode() # default BEENode.children = None
-                # self.root_matrix[idx][idy].children[i].min_z = min(pts[index][...,2])
-                self.root_matrix[idx][idy].children[i].pts_id = pts[index]
-                self.root_matrix[idx][idy].children[i].pts_num = len(index)
-                self.root_matrix[idx][idy].binary_data |= 1 << i
+            self.root_matrix[idx][idy].min_z = minz_matrix_ori[idx][idy]
+            idz = np.divide(pts[...,2] - self.root_matrix[idx][idy].min_z, self.unit_z).astype(int)
 
-            if overheight_id[0].size != 0:
-                index = overheight_id
-                i = SIZE_OF_INT - 2
-                self.root_matrix[idx][idy].children[i] = BEENode() # default BEENode.children = None
-                # self.root_matrix[idx][idy].children[i].min_z = min(pts[index][...,2])
-                self.root_matrix[idx][idy].children[i].pts_id = pts[index]
-                self.root_matrix[idx][idy].children[i].pts_num = len(index)
-                self.root_matrix[idx][idy].binary_data |= 1 << i
-            self.root_matrix[idx][idy].pts_id = pts_id
-            self.root_matrix[idx][idy].pts_num = len(pts)
-            self.pts_num_in_unit[idx][idy] = ie - ib
+            idz_sorted = np.unique(idz)
+            overheight_index_search = np.searchsorted(idz_sorted, SIZE_OF_INT - 2, side='right')
+            filtered_array_search = idz_sorted[np.searchsorted(idz_sorted, 0, side='left'):overheight_index_search]
+            exists_overheight = overheight_index_search < len(idz_sorted) - 1 and idz_sorted[overheight_index_search+1] > SIZE_OF_INT - 2
+
+            self.root_matrix[idx][idy].binary_data = np.sum(1 << filtered_array_search)
+            if (exists_overheight):
+                self.root_matrix[idx][idy].binary_data |= 1 << SIZE_OF_INT - 2
 
     def get_binary_matrix(self):
         self.binary_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
@@ -256,6 +262,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
 
     def generate_blind_grid_mask(self):
         r = int(2.0 / self.unit_x) + 1 # for 2m+ range blind
+        # r = 0 # (optional) disable range blind
         BlindGridMask = np.ones((self.matrix_order, self.matrix_order), dtype=int)
         for i, j in itertools.product(range(-r, r), range(-r, r)):
             BlindGridMask[int(self.matrix_order/2)+i][int(self.matrix_order/2)+j] = 0

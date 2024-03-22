@@ -43,7 +43,7 @@ RANGE = 40 # m, from cetner point to an square
 RESOLUTION = 1 # m, resolution default 1m
 H_RES = 0.5 # m, resolution default 1m
 
-DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/KITTI/00"
+DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/KITTI/05"
 MAX_RUN_FILE_NUM = -1 # -1 for all files
 
 timer = dztimer.Timing()
@@ -75,8 +75,7 @@ all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
 for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     if file_cnt>MAX_RUN_FILE_NUM and MAX_RUN_FILE_NUM!=-1:
         break
-    t1 = time.time()
-    timer[5].start("One Scan Cost")
+    timer[4].start("One Scan Cost")
     timer[1].start("Query BeeTree")
     Qpts = BEETree()
     Qpts.set_points_from_file(f"{DATA_FOLDER}/pcd/{pcd_file}")
@@ -86,27 +85,25 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     Qpts.matrix_order = (int)(RANGE / RESOLUTION)
     Qpts.calculate_query_matrix_start_id()
     
-    t15 = time.time()
-    Qpts.generate_query_binary_tree(Mpts.minz_matrix)
-    print("generate_query_binary_tree cost: ",time.time() - t15)
-    Qpts.get_binary_matrix()
 
     # pre-process
     map_binary_matrix_roi = Qpts.calculate_map_roi(Mpts.binary_matrix)
     minz_matrix_roi = Qpts.calculate_map_roi(Mpts.minz_matrix)
     outlier_matrix_roi = Qpts.calculate_map_roi(Mpts.outlier_matrix)
 
+
+    Qpts.generate_query_binary_tree(minz_matrix_roi)
+    Qpts.get_binary_matrix()
+
+
+
     binary_xor = (~Qpts.binary_matrix) & map_binary_matrix_roi
     trigger = binary_xor
     timer[1].stop()
 
-    # BGM
-    timer[2].start("BGM")
-    Qpts.BlindGridMask = Qpts.generate_blind_grid_mask()
-    timer[2].stop()
-
-    timer[3].start("SRM with RV")
+    timer[2].start("Static Restoration")
     # SRM
+    Qpts.BlindGridMask = Qpts.generate_blind_grid_mask()
     Qpts.SightRangeMask = Qpts.generate_sight_range_mask(k, minz_matrix_roi, outlier_matrix_roi)
     trigger &= ~Qpts.SightRangeMask
     trigger &= ~(Qpts.BlindGridMask - 1)
@@ -114,11 +111,14 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     # RV ray casting
     blocked_mask = Qpts.reverse_virtual_ray_casting(trigger, minz_matrix_roi)
     trigger &= ~blocked_mask
-    timer[3].stop()
+    timer[2].stop()
 
-    timer[4].start("LOGIC")
+    timer[3].start("Fine Ground Seg")
     ground_index_matrix = np.log2((trigger & -trigger) >> 1).astype(int)
     ground_trigger = Mpts.calculate_ground_mask(Qpts, ground_index_matrix)
+
+    timer[3].stop()
+
     for (i,j) in list(zip(*np.where(trigger != 0))):
         z = Mpts.binTo3id(trigger[i][j])
         for idz in z:
@@ -126,32 +126,19 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
         gz = Mpts.binTo3id(ground_trigger[i][j])
         for idgz in gz:
             points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[ground_index_matrix[i][j]].children[idgz].pts_id).tolist()
+    points_index2Remove = list(set(points_index2Remove))
 
-    t_tmp = time.time() - t1
-    print("finished Q, cost: ", t_tmp, " s")
-    t_list.append(t_tmp)
     timer[4].stop()
-    timer[5].stop()
 
-mean_t = sum(t_list) / len(t_list)
-np_t_list = np.array(t_list)
-dev_t = np.std(np_t_list)
-print("frame time: ", mean_t , "range: ", dev_t)
 
 print(f"There are {len(points_index2Remove)} pts to remove")
 
-visited = set()
-dup_index2Remove = list({x for x in points_index2Remove if x in visited or (visited.add(x) or False)})
-print(f"There are {len(dup_index2Remove)} pts to remove now")
 print(f" running time: {time.time() - starttime}")
 points_index2Retain =np.setdiff1d(np.arange(len(Mpts.original_points)), points_index2Remove)
 outlier_cloud = Mpts.original_points[points_index2Retain]
-# inlier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove)
-# oulier_cloud = Mpts.o3d_original_points.select_by_index(points_index2Remove, invert=True)
 
-save_pcd(f"{DATA_FOLDER}/edomap_output.pcd", outlier_cloud) # static map
+save_pcd(f"{DATA_FOLDER}/beautymap_output.pcd", outlier_cloud) # static map
 
-# save_pcd(f"{DATA_FOLDER}/edomap_output_r.pcd", np.array(inlier_cloud.points))
 timer.stop()
 timer.print(title="BeautyMap",random_colors=True, bold=True)
 print(f"{os.path.basename( __file__ )}: All codes run successfully, Close now..")

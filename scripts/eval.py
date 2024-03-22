@@ -15,7 +15,7 @@ SEQUENCE_SELECT = ["05"]
 # SEQUENCE_SELECT = [""]
 
 # Step 1: Read your existing csv file
-with open(f'{BASE_DIR}/scripts/benchmark_results.csv', 'r') as file:
+with open(f'{BASE_DIR}/scripts/benchmark_results_HA.csv', 'r') as file:
     reader = csv.DictReader(file)
     data = list(reader)
 
@@ -41,10 +41,12 @@ for sequence in SEQUENCE_SELECT:
 
     static_accuracy = float(right_static) / float(num_gt['static']) * 100
     dynamic_accuracy = float(right_dynamic) / float(num_gt['dynamic']) * 100
-    AA = math.sqrt(static_accuracy*dynamic_accuracy)
+    # AA = math.sqrt(static_accuracy*dynamic_accuracy)
+    HA = 2 * static_accuracy*dynamic_accuracy/ (static_accuracy + dynamic_accuracy)
 
-    row_dict['# TN'], row_dict['# FN'], row_dict['# TP'], row_dict['# FP'], row_dict['SA ↑'], row_dict['DA ↑'], row_dict['AA ↑'] =\
-        right_static, wrong_static, right_dynamic, wrong_dynamic, static_accuracy, dynamic_accuracy, AA
+
+    row_dict['# TN'], row_dict['# FN'], row_dict['# TP'], row_dict['# FP'], row_dict['SA ↑'], row_dict['DA ↑'], row_dict['HA ↑'] =\
+        right_static, wrong_static, right_dynamic, wrong_dynamic, static_accuracy, dynamic_accuracy, HA
     data.append(row_dict)
 
 import csv
@@ -53,9 +55,9 @@ from tabulate import tabulate
 sequences = set([row['Sequence'] for row in data])
 for sequence in SEQUENCE_SELECT: #sequences:
     filtered_data = [row for row in data if row['Sequence'] == sequence]
-    table_data = [[row['Methods'], row['# TN'], row['# TP'], row['SA ↑'], row['DA ↑'], row['AA ↑']] for row in filtered_data]
+    table_data = [[row['Methods'], row['# TN'], row['# TP'], row['SA ↑'], row['DA ↑'], row['HA ↑']] for row in filtered_data]
 
     # print the data
     print('Sequence: ', sequence)
-    print(tabulate(table_data, headers=['Methods', '# TN', '# TP', 'SA ↑', 'DA ↑', 'AA ↑'], tablefmt='orgtbl'))
+    print(tabulate(table_data, headers=['Methods', '# TN', '# TP', 'SA ↑', 'DA ↑', 'HA ↑'], tablefmt='orgtbl'))
     print('='*20, ' Friendly dividing line ^v^ ', '='*20, '\n')
