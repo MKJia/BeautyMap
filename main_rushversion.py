@@ -43,8 +43,9 @@ RANGE = 40 # m, from cetner point to an square
 RESOLUTION = 1 # m, resolution default 1m
 H_RES = 0.5 # m, resolution default 1m
 
-DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/KITTI/05"
+DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/KITTI/01"
 MAX_RUN_FILE_NUM = -1 # -1 for all files
+SIZE_OF_INT = 32 # 64
 
 timer = dztimer.Timing()
 timer.start("Total")
@@ -71,7 +72,7 @@ timer[0].stop()
 print("finished M, cost: ", time.time() - t1, " s")
 
 global_trigger = np.zeros([Mpts.matrix_order, Mpts.matrix_order], dtype=int)
-global_ground_trigger = np.zeros([Mpts.matrix_order, Mpts.matrix_order], dtype=int)
+global_ground_trigger = np.zeros([SIZE_OF_INT, Mpts.matrix_order, Mpts.matrix_order], dtype=int)
 
 all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
 
@@ -119,24 +120,21 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     timer[3].start("Fine Ground Seg")
     ground_index_matrix = np.log2((trigger & -trigger) >> 1).astype(int)
     ground_trigger = Mpts.calculate_ground_mask(Qpts, ground_index_matrix)
+    global_trigger[Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] |= trigger
+    global_ground_trigger[:, Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] |= ground_trigger
 
     timer[3].stop()
 
-    global_trigger[Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] = trigger
-    global_ground_trigger[Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] = ground_trigger
-
-    timer[4].stop()
-
-global_ground_index_matrix = np.log2((global_trigger & -global_trigger) >> 1).astype(int)
 for (i,j) in list(zip(*np.where(global_trigger != 0))):
     z = Mpts.binTo3id(global_trigger[i][j])
     for idz in z:
         points_index2Remove += (Mpts.root_matrix[i][j].children[idz].pts_id).tolist()
-    gz = Mpts.binTo3id(global_ground_trigger[i][j])
-    for idgz in gz:
-        points_index2Remove += (Mpts.root_matrix[i][j].children[global_ground_index_matrix[i][j]].children[idgz].pts_id).tolist()
-# points_index2Remove = list(set(points_index2Remove))
+    for cid in range(len(global_ground_trigger)):
+        gz = Mpts.binTo3id(global_ground_trigger[cid][i][j])
+        for idgz in gz:
+            points_index2Remove += (Mpts.root_matrix[i][j].children[cid].children[idgz].pts_id).tolist()    # points_index2Remove = list(set(points_index2Remove))
 
+    timer[4].stop()
 
 
 print(f"There are {len(points_index2Remove)} pts to remove")

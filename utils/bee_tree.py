@@ -280,7 +280,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.start_id_y = (int)(self.start_xy[1] / self.unit_y)
 
     def calculate_ground_mask(self, Qpts, ground_index_matrix):
-        ground_mask = np.zeros([Qpts.matrix_order, Qpts.matrix_order], dtype=int)
+        ground_mask = np.zeros([SIZE_OF_INT, Qpts.matrix_order, Qpts.matrix_order], dtype=int)
         for ii in range(Qpts.matrix_order):
             i = ii + Qpts.start_id_x
             for jj in range(Qpts.matrix_order):
@@ -294,7 +294,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                         if self.root_matrix[i][j].children[cid].children[k] is not None:
                             pts_num += self.root_matrix[i][j].children[cid].children[k].pts_num
                             if pts_num *1.0 / all_pts_num >= GPNR:
-                                ground_mask[ii][jj] |= ((1 & next_flag) << k) # 1 for triggered and 0 for protected
+                                ground_mask[cid][ii][jj] |= ((1 & next_flag) << k) # 1 for triggered and 0 for protected
                                 next_flag = True
         return ground_mask
 
