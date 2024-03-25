@@ -70,6 +70,9 @@ Mpts.get_minz_matrix()
 timer[0].stop()
 print("finished M, cost: ", time.time() - t1, " s")
 
+global_trigger = np.zeros([Mpts.matrix_order, Mpts.matrix_order], dtype=int)
+global_ground_trigger = np.zeros([Mpts.matrix_order, Mpts.matrix_order], dtype=int)
+
 all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
 
 for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
@@ -119,16 +122,21 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
 
     timer[3].stop()
 
-    for (i,j) in list(zip(*np.where(trigger != 0))):
-        z = Mpts.binTo3id(trigger[i][j])
-        for idz in z:
-            points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[idz].pts_id).tolist()
-        gz = Mpts.binTo3id(ground_trigger[i][j])
-        for idgz in gz:
-            points_index2Remove += (Mpts.root_matrix[i+Qpts.start_id_x][j+Qpts.start_id_y].children[ground_index_matrix[i][j]].children[idgz].pts_id).tolist()
-    points_index2Remove = list(set(points_index2Remove))
+    global_trigger[Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] = trigger
+    global_ground_trigger[Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] = ground_trigger
 
     timer[4].stop()
+
+global_ground_index_matrix = np.log2((global_trigger & -global_trigger) >> 1).astype(int)
+for (i,j) in list(zip(*np.where(global_trigger != 0))):
+    z = Mpts.binTo3id(global_trigger[i][j])
+    for idz in z:
+        points_index2Remove += (Mpts.root_matrix[i][j].children[idz].pts_id).tolist()
+    gz = Mpts.binTo3id(global_ground_trigger[i][j])
+    for idgz in gz:
+        points_index2Remove += (Mpts.root_matrix[i][j].children[global_ground_index_matrix[i][j]].children[idgz].pts_id).tolist()
+# points_index2Remove = list(set(points_index2Remove))
+
 
 
 print(f"There are {len(points_index2Remove)} pts to remove")
