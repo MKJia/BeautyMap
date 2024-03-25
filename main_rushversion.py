@@ -15,12 +15,10 @@ np.set_printoptions(threshold=np.inf)
 from tqdm import tqdm
 import sys, os
 BASE_DIR = os.path.abspath(os.path.dirname( __file__ ))
-# pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ dztimer
-import dztimer # only py38 can use now, working to publish on pypi
+import dztimer
 
 # vis
 import open3d as o3d
-o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
 import matplotlib.pyplot as plt
 
 # self
@@ -76,7 +74,7 @@ global_ground_trigger = np.zeros([SIZE_OF_INT, Mpts.matrix_order, Mpts.matrix_or
 
 all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
 
-for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
+for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files), total=len(all_pcd_files), ncols=100, desc="Processing"):
     if file_cnt>MAX_RUN_FILE_NUM and MAX_RUN_FILE_NUM!=-1:
         break
     timer[4].start("One Scan Cost")
@@ -124,6 +122,7 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files)):
     global_ground_trigger[:, Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] |= ground_trigger
 
     timer[3].stop()
+    timer[4].stop()
 
 for (i,j) in list(zip(*np.where(global_trigger != 0))):
     z = Mpts.binTo3id(global_trigger[i][j])
@@ -133,9 +132,6 @@ for (i,j) in list(zip(*np.where(global_trigger != 0))):
         gz = Mpts.binTo3id(global_ground_trigger[cid][i][j])
         for idgz in gz:
             points_index2Remove += (Mpts.root_matrix[i][j].children[cid].children[idgz].pts_id).tolist()    # points_index2Remove = list(set(points_index2Remove))
-
-    timer[4].stop()
-
 
 print(f"There are {len(points_index2Remove)} pts to remove")
 

@@ -66,7 +66,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.original_points = PointCloudData.np_data
         self.center = np.mean(self.original_points[:,:3],axis=0)
         self.start_xy = np.array([.0,.0]) # Only for map, once
-        print(f"Number of points: {self.original_points.shape}")
+        # print(f"Number of points: {self.original_points.shape}")
 
     def set_unit_params(self, unit_x, unit_y, unit_z):
         self.unit_x = unit_x
@@ -124,7 +124,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         id_end.remove(0)
         id_end.append(len(newidxyz))
 
-        for iid in tqdm(range(len(id_begin))):
+        for iid in tqdm(range(len(id_begin)), desc='Generating Map Binary tree', ncols=100):
             ib = id_begin[iid]
             ie = id_end[iid]
             idx = newidxyz[ib][0]
