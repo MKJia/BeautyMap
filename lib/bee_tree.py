@@ -1,4 +1,8 @@
 # Updated: 2023-3-06 13:20
+# Copyright (C) 2022-now, KTH-RPL, HKUST-RamLab
+# Author:
+# Mingkai Jia  (https://mkjia.github.io/)
+# Kin ZHANG  (https://kin-zhang.github.io/)
 
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
@@ -6,30 +10,21 @@
 # math
 import itertools
 import numpy as np
-import pandas as pd
 
-import open3d as o3d
-import matplotlib.pyplot as plt
-from utils import quat2mat
-import time
-from collections import defaultdict
 import copy
-from . import load_view_point
-from .pcdpy3 import load_pcd
+from utils.pcdpy3 import load_pcd
 from tqdm import tqdm
 
-SIZE_OF_INT = 32 # 64
-MAX_OF_INT = 0xffffffff # 0xffffffffffffffff
+MAX_HEIGHT = 32
 MIN_Z_RES = 0.1 # minimum hierarchical height resolution
 GPNR = 0.85 # Ground Points Number Ratio
 RANGE_OF_SIGHT = 15 # m Points over this range become unreliable
 
-class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
+class BEETree: # Binary-Encoded Eliminate Tree
     def __init__(self):
         # points
         self.original_points = None
         self.non_negtive_points = None
-        self.o3d_original_points = None
 
         # unit parameters
         self.unit_x = None
@@ -40,24 +35,19 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.center = None
         self.non_negtive_center = None
         self.coordinate_offset = None
-        self.poses = None
         self.start_xy = None
         self.matrix_order = None
         self.start_id_x = 0
         self.start_id_y = 0
         self.viewpoint_z = 0
+        self.max_height = MAX_HEIGHT
 
         # map structure
         self.root_matrix = None
         self.pts_num_in_unit = None
         self.binary_matrix = None
-        self.ground_binary_matrix = None
         self.minz_matrix = None
         self.outlier_matrix = None
-
-        # VVR
-        self.BlindGridMask = None
-        self.SightRangeMask = None
 
     def set_points_from_file(self, filename):
         ## 0. Read Point Cloud
@@ -66,7 +56,6 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.original_points = PointCloudData.np_data
         self.center = np.mean(self.original_points[:,:3],axis=0)
         self.start_xy = np.array([.0,.0]) # Only for map, once
-        # print(f"Number of points: {self.original_points.shape}")
 
     def set_unit_params(self, unit_x, unit_y, unit_z):
         self.unit_x = unit_x
@@ -92,7 +81,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         min_x = min(self.non_negtive_points[...,0])
         min_y = min(self.non_negtive_points[...,1])
         print(f"Max/Min value on x: {max_x}/{min_x}, y: {max_y}/{min_y}")
-        self.matrix_order = max((max_x - min_x)/ self.unit_x, (max_y - min_y) / self.unit_y).astype(int) + 1  # old version self.dim_2d
+        self.matrix_order = max((max_x - min_x)/ self.unit_x, (max_y - min_y) / self.unit_y).astype(int) + 1
         print(f"Matrix order: {self.matrix_order}")
         self.minz_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=float) + float("inf") # Only for map, once
 
@@ -114,7 +103,6 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         id_begin = np.array([],dtype=int)
         id_end = np.array([],dtype=int)
 
-        # id_begin = [i for i, v in enumerate(newidxyz) if i == 0 or (v[0] != newidxyz[i-1][0] or v[1] != newidxyz[i-1][1])]
         x_diff = newidxyz[1:, 0] != newidxyz[:-1, 0]
         y_diff = newidxyz[1:, 1] != newidxyz[:-1, 1]
         id_begin = (np.flatnonzero(x_diff | y_diff) + 1 ).tolist()
@@ -136,7 +124,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             self.root_matrix[idx][idy] = BEENode()
             min_z = min(pts[...,2])
             neighbour_array = self.calculate_median(idx, idy)
-            if len(neighbour_array) != 0: # Adaptable Ground Height Adjustment
+
+            # coarse ground extraction
+            if len(neighbour_array) != 0:
                 min_z_median = np.median(neighbour_array)
                 min_z_MAD = np.median(np.abs(neighbour_array - min_z_median))
                 if min_z < min_z_median - 3 * min_z_MAD:
@@ -144,6 +134,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                     self.outlier_matrix[idx][idy] = 1
                 elif min_z > min_z_median + 3 * min_z_MAD:
                     min_z = min_z_median + 3 * min_z_MAD
+
             self.root_matrix[idx][idy].min_z = min_z
             idz = np.divide(pts[...,2] - self.root_matrix[idx][idy].min_z, self.unit_z).astype(int)
             self.root_matrix[idx][idy].register_points(pts, idz, self.unit_z, pts_id)
@@ -164,7 +155,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         return np.asarray(min_z_list)
 
     def generate_query_binary_tree(self, minz_matrix_ori):
-        """Generates a simple binary tree
+        """Generates a simple query binary tree
         """
         points_in_map_frame = self.non_negtive_points - [self.start_xy[0], self.start_xy[1], 0]
         points_in_range_id = (points_in_map_frame[:, 0] >= 0) & (points_in_map_frame[:, 1] >= 0) & (points_in_map_frame[:, 0] < self.matrix_order*self.unit_x) & (points_in_map_frame[:, 1] < self.matrix_order*self.unit_y)
@@ -174,7 +165,6 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         newidxy = idxy[ori_id]
 
         self.root_matrix = np.empty([self.matrix_order, self.matrix_order], dtype=object)
-        # self.pts_num_in_unit = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
 
         id_begin = np.array([],dtype=int)
         id_end = np.array([],dtype=int)
@@ -183,22 +173,9 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         id_begin = (np.flatnonzero(x_diff | y_diff) + 1 ).tolist()
         id_begin.insert(0, 0)
 
-        # id_begin = [i for i, v in enumerate(newidxy) if i == 0 or (v[0] != newidxy[i-1][0] or v[1] != newidxy[i-1][1])]
         id_end = copy.deepcopy(id_begin)
         id_end.remove(0)
         id_end.append(len(newidxy))
-        t2 = []
-        ib = []
-        ie = []
-        idx = None
-        idy = None
-        pts_id = None
-        pts = None
-        idz = None
-        overheight_index_search = None
-        exists_overheight = None
-        idz_sorted = None
-        filtered_array_search = None
 
         for iid in range(len(id_begin)):
             ib = id_begin[iid]
@@ -212,13 +189,13 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
             idz = np.divide(pts[...,2] - self.root_matrix[idx][idy].min_z, self.unit_z).astype(int)
 
             idz_sorted = np.unique(idz)
-            overheight_index_search = np.searchsorted(idz_sorted, SIZE_OF_INT - 2, side='right')
+            overheight_index_search = np.searchsorted(idz_sorted, MAX_HEIGHT - 2, side='right')
             filtered_array_search = idz_sorted[np.searchsorted(idz_sorted, 0, side='left'):overheight_index_search]
-            exists_overheight = overheight_index_search < len(idz_sorted) - 1 and idz_sorted[overheight_index_search+1] > SIZE_OF_INT - 2
+            exists_overheight = overheight_index_search < len(idz_sorted) - 1 and idz_sorted[overheight_index_search+1] > MAX_HEIGHT - 2
 
             self.root_matrix[idx][idy].binary_data = np.sum(1 << filtered_array_search)
             if (exists_overheight):
-                self.root_matrix[idx][idy].binary_data |= 1 << SIZE_OF_INT - 2
+                self.root_matrix[idx][idy].binary_data |= 1 << MAX_HEIGHT - 2
 
     def get_binary_matrix(self):
         self.binary_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
@@ -251,13 +228,13 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         highest_bit = (np.log2(no_ground+1)).astype(int)
         self.viewpoint_z = (self.non_negtive_center[2] - minz_matrix[int(self.matrix_order/2)][int(self.matrix_order/2)]) / self.unit_z + 0.5
         for i, j in itertools.product(range(0, 0+r), range(0, 0+r)):
-            highest_sight_bit = min(SIZE_OF_INT-1, int(self.viewpoint_z + np.sqrt((r/2-i)**2+(r/2-j)**2) * k + 0.5))
+            highest_sight_bit = min(MAX_HEIGHT-1, int(self.viewpoint_z + np.sqrt((r/2-i)**2+(r/2-j)**2) * k + 0.5))
             if ground[i][j] == 0 and (i - r/2)**2 + (j - r/2)**2 >= (RANGE_OF_SIGHT / self.unit_y)**2:
-                sight_mask[i][j] = MAX_OF_INT
+                sight_mask[i][j] = 2 ** MAX_HEIGHT - 1
             elif highest_bit[i][j] > 0 and outlier_matrix[i][j] == 0:
-                sight_mask[i][j] = MAX_OF_INT-2**highest_bit[i][j]+1
+                sight_mask[i][j] = 2 ** MAX_HEIGHT - 2 ** highest_bit[i][j]
             else:
-                sight_mask[i][j] = MAX_OF_INT-2**highest_sight_bit+1
+                sight_mask[i][j] = 2 ** MAX_HEIGHT - 2 ** highest_sight_bit
         return sight_mask
 
     def generate_blind_grid_mask(self):
@@ -280,7 +257,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
         self.start_id_y = (int)(self.start_xy[1] / self.unit_y)
 
     def calculate_ground_mask(self, Qpts, ground_index_matrix):
-        ground_mask = np.zeros([SIZE_OF_INT, Qpts.matrix_order, Qpts.matrix_order], dtype=int)
+        ground_mask = np.zeros([MAX_HEIGHT, Qpts.matrix_order, Qpts.matrix_order], dtype=int)
         for ii in range(Qpts.matrix_order):
             i = ii + Qpts.start_id_x
             for jj in range(Qpts.matrix_order):
@@ -290,7 +267,7 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
                     all_pts_num = self.root_matrix[i][j].children[cid].pts_num
                     pts_num = 0
                     next_flag = False
-                    for k in range(SIZE_OF_INT):
+                    for k in range(MAX_HEIGHT):
                         if self.root_matrix[i][j].children[cid].children[k] is not None:
                             pts_num += self.root_matrix[i][j].children[cid].children[k].pts_num
                             if pts_num *1.0 / all_pts_num >= GPNR:
@@ -359,8 +336,8 @@ class BEETree: # Binary-Encoded Eliminate Tree (Any B Number in my mind?)
 
 class BEENode:
     def __init__(self):
-        self.binary_data = 0 # int64
-        self.children = None # np.empty(SIZE_OF_INT, dtype=object) # ndarray(BEENode)[63]
+        self.binary_data = 0
+        self.children = None
         self.pts_id = None
         self.pts_num = None
         self.min_z = float("inf")
@@ -368,37 +345,30 @@ class BEENode:
     def register_points(self, pts, idz, unit_z, pts_id):
         """Register all points in BEENodes
 
-        BEETree(ROOT) -> N*N BEENodes(BRANCH) ->Children BEENodes(LEAF)
+        BEETree(ROOT) -> N*N BEENodes ->Children
 
         Args:
-            pts: ndarray list of points selected by index(ptid_in_unit_ij),
-            one function can register all points in one unit
-            idz: ndarray list of idz selected by index(ptid_in_unit_ij),
-            each single value needs to be 0 <= idz[i] <= 62 for int64,
-            fortunately we have non-negatificated points so it obviously >= 0,
-            and 1 << idz[i] will become 0 for those bigger than 63.
-            So we only need to deal with 63 (Or it will ERROR :ufunc 'bitwise_or'
-            not supported for the input types, and the inputs could not be safely
-            coerced to any supported types according to the casting rule ''safe'')
+            pts: ndarray list of points selected by index
+            idz: ndarray list of idz selected by index
         """
         if unit_z > MIN_Z_RES:
-            hierarchical_unit_z = max(MIN_Z_RES, unit_z / (SIZE_OF_INT-1))
-            self.children = np.empty(SIZE_OF_INT, dtype=object)
+            hierarchical_unit_z = max(MIN_Z_RES, unit_z / (MAX_HEIGHT-1))
+            self.children = np.empty(MAX_HEIGHT, dtype=object)
         elif unit_z == MIN_Z_RES:
             hierarchical_unit_z = 0.0
-            self.children = np.empty(SIZE_OF_INT, dtype=object)
+            self.children = np.empty(MAX_HEIGHT, dtype=object)
         else:
             self.children = None
             self.pts_id = pts_id
             self.pts_num = len(pts)
             return 0
         in_ground_flag = False
-        for i in range(SIZE_OF_INT):
+        for i in range(MAX_HEIGHT):
             overheight_id = np.where(idz>=i)
             in_node_id = np.where(idz==i)
             upper_node_id = np.where(idz==i+1)
-            if i == SIZE_OF_INT - 1 and overheight_id[0].size != 0:
-                ii = SIZE_OF_INT - 2 # to protect SIZE_OF_INT - 1
+            if i == MAX_HEIGHT - 1 and overheight_id[0].size != 0:
+                ii = MAX_HEIGHT - 2 # to protect MAX_HEIGHT - 1 if using MAX_HEIGHT == 64 for int64
                 index = overheight_id
             elif in_node_id[0].size == 0:
                 self.children[i] = None
@@ -420,7 +390,7 @@ class BEENode:
 
     def get_num(self):
         l = []
-        for i in range(SIZE_OF_INT):
+        for i in range(MAX_HEIGHT):
             if self.children[i] is not None:
                 l.append(self.children[i].pts_num)
             else:

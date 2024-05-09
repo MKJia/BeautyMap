@@ -9,7 +9,7 @@ from utils import cnt_staticAdynamic
 
 DATA_FOLDER = "/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/KITTI"
 METHODS_NAME = "beautymap"
-SEQUENCE_SELECT = ["05"]
+SEQUENCE_SELECT = ["01"]
 # DATA_FOLDER = "/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/cones_two_people"
 # METHODS_NAME = "beautymap"
 # SEQUENCE_SELECT = [""]

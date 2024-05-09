@@ -1,13 +1,13 @@
-EDOMap
+BeautyMap
 ---
 
-Title: Eliminate Dynamic Obstacle points  in the Global map (ERASOR++
+Title: [RA-L'24] BeautyMap: Binary-Encoded Adaptable Ground Matrix for Dynamic Points Removal in Global Maps
 
-Authors: Qingwen ZHANG, Mingkai JIA, Ruoyu GENG
+Authors: Mingkai JIA, Qingwen ZHANG, ...
 
 Not only limited on the scenarios, point clouds are enough for remove! TESTED SENSOR: Velodyne-16, Velodyne-64, MEMS, Leica BLK360
 
-To improve the ERASOR in speed and remove theory in math. Check [Kin's notion page](https://www.notion.so/kinzhang/EDOMap-Eliminate-Dynamic-Obstacle-points-in-the-Global-map-ERASOR-6732884af87d430e9405c1e5e5c6ad73) for more detail improvement thinking.
+<!-- To improve the ERASOR in speed and remove theory in math. Check [Kin's notion page](https://www.notion.so/kinzhang/EDOMap-Eliminate-Dynamic-Obstacle-points-in-the-Global-map-ERASOR-6732884af87d430e9405c1e5e5c6ad73) for more detail improvement thinking.
 
 
 
@@ -65,4 +65,4 @@ print(f"{points.shape}")
 ```
 
 Issues:
-1. [https://stackoverflow.com/questions/52727700/sklearn-kmeans-convergence-warning](https://stackoverflow.com/questions/52727700/sklearn-kmeans-convergence-warning)
+1. [https://stackoverflow.com/questions/52727700/sklearn-kmeans-convergence-warning](https://stackoverflow.com/questions/52727700/sklearn-kmeans-convergence-warning) -->

@@ -6,7 +6,7 @@
 
 import numpy as np
 import open3d as o3d
-from .o3d_view import ViewControl
+# from .o3d_view import ViewControl
 import os
 def check_file_exists(file_path):
     if os.path.exists(file_path) is False:
@@ -32,18 +32,18 @@ def save_view_point(viewThings: list, filename):
     vis.destroy_window()
 
 
-def load_view_point(viewThings: list, filename=None):
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    ctr = vis.get_view_control()
-    for sth in viewThings:
-        vis.add_geometry(sth)
+# def load_view_point(viewThings: list, filename=None):
+#     vis = o3d.visualization.Visualizer()
+#     vis.create_window()
+#     ctr = vis.get_view_control()
+#     for sth in viewThings:
+#         vis.add_geometry(sth)
     
-    if filename is not None:
-        o3d_vctrl = ViewControl(ctr, filename)
+#     if filename is not None:
+#         o3d_vctrl = ViewControl(ctr, filename)
     
-    vis.run()
-    vis.destroy_window()
+#     vis.run()
+#     vis.destroy_window()
 
 # https://github.com/openai/mujoco-worldgen/blob/master/mujoco_worldgen/util/rotation.py
 # For testing whether a number is close to zero

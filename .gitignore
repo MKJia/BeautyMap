@@ -1,11 +1,7 @@
 *.pcd
 *.bin
 *.label
-# *.csv
-
-.vscode/*
-
 *.pyc
-
 *.DS_Store
 build/
+.vscode/*
