@@ -220,7 +220,13 @@ class BEETree: # Binary-Encoded Eliminate Tree
         tmp2 = np.sqrt(tmp1[:,0] ** 2 + tmp1[:,1] ** 2)
         return max(tmp1[:,2]/tmp2)
 
-    def generate_sight_range_mask(self, k, minz_matrix, outlier_matrix):
+    def generate_static_restoration_mask(self, k, minz_matrix, outlier_matrix):
+        # range mask (optional)
+        blind_range = int(2.0 / self.unit_x) + 1
+        range_mask = np.ones((self.matrix_order, self.matrix_order), dtype=int)
+        for i, j in itertools.product(range(-blind_range, blind_range), range(-blind_range, blind_range)):
+            range_mask[int(self.matrix_order/2)+i][int(self.matrix_order/2)+j] = 0
+        # visibility mask
         r = self.matrix_order
         sight_mask = np.zeros((r, r), dtype=int)
         no_ground = self.binary_matrix & (-2) # -0xffff fffe
@@ -235,7 +241,7 @@ class BEETree: # Binary-Encoded Eliminate Tree
                 sight_mask[i][j] = 2 ** MAX_HEIGHT - 2 ** highest_bit[i][j]
             else:
                 sight_mask[i][j] = 2 ** MAX_HEIGHT - 2 ** highest_sight_bit
-        return sight_mask
+        return sight_mask | (range_mask - 1)
 
     def generate_blind_grid_mask(self):
         r = int(2.0 / self.unit_x) + 1 # for 2m+ range blind

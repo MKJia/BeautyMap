@@ -17,11 +17,9 @@ import os
 import dztimer
 
 # self
-from utils.global_def import *
 from lib.bee_tree import BEETree
 from utils.pcdpy3 import save_pcd
 
-starttime = time.time()
 t_list = []
 
 '''
@@ -38,14 +36,13 @@ For KITTI dataset
 RANGE = 40 # m, from center point to an square
 RESOLUTION = 1 # m, resolution default 1m
 H_RES = 0.5 # m, resolution default 1m
-# DATA_FOLDER = f"/path/to/your/data/KITTI/xx"
-DATA_FOLDER = f"/home/mjiaab/workspace/edo_ws/edomap_release/edomap/data/KITTI/01"
+DATA_FOLDER = f"/path/to/your/data/KITTI/xx"
 
 MAX_RUN_FILE_NUM = -1 # -1 for all files
 
 timer = dztimer.Timing()
 timer.start("Total")
-print(f"We will process the data in folder: {bc.BOLD}{DATA_FOLDER}{bc.ENDC}")
+print(f"We will process the data in folder: '\033[1m'{DATA_FOLDER}'\033[0m'")
 
 
 # read raw map or gt cloud
@@ -71,7 +68,7 @@ global_ground_trigger = np.zeros([Mpts.max_height, Mpts.matrix_order, Mpts.matri
 
 # process
 all_pcd_files = sorted(os.listdir(f"{DATA_FOLDER}/pcd"))
-for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files), total=len(all_pcd_files), ncols=100, desc="Processing"):
+for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files), total=len(all_pcd_files), ncols=100, desc="Processing Frames"):
     if file_cnt>MAX_RUN_FILE_NUM and MAX_RUN_FILE_NUM!=-1:
         break
     timer[5].start("One Scan Cost")
@@ -98,32 +95,27 @@ for file_cnt, pcd_file in tqdm(enumerate(all_pcd_files), total=len(all_pcd_files
     # matrix comparison
     timer[2].start("Matrix Comparison")
     binary_xor = (~Qpts.binary_matrix) & map_binary_matrix_roi
-    trigger = binary_xor
     timer[2].stop()
 
     # static restoration
     timer[3].start("Static Restoration")
     # out-of-sight protection
-    Qpts.BlindGridMask = Qpts.generate_blind_grid_mask()
-    Qpts.SightRangeMask = Qpts.generate_sight_range_mask(k, minz_matrix_roi, outlier_matrix_roi)
-    trigger &= ~Qpts.SightRangeMask
-    trigger &= ~(Qpts.BlindGridMask - 1)
-    trigger &= ~(map_binary_matrix_roi & -map_binary_matrix_roi) # Remove the lowest of the trigger, which is further calculated in LOGIC
+    binary_xor &= ~Qpts.generate_static_restoration_mask(k, minz_matrix_roi, outlier_matrix_roi)
+    binary_xor &= ~(map_binary_matrix_roi & -map_binary_matrix_roi) # Remove the lowest of the binary_xor, which is further calculated in Fine Ground Seg
     # reverse virtual ray casting
-    blocked_mask = Qpts.reverse_virtual_ray_casting(trigger, minz_matrix_roi)
-    trigger &= ~blocked_mask
+    binary_xor &= ~Qpts.reverse_virtual_ray_casting(binary_xor, minz_matrix_roi)
     timer[3].stop()
 
     # fine ground segmentation
     timer[4].start("Fine Ground Seg")
-    ground_index_matrix = np.log2((trigger & -trigger) >> 1).astype(int)
+    ground_index_matrix = np.log2((binary_xor & -binary_xor) >> 1).astype(int)
     ground_trigger = Mpts.calculate_ground_mask(Qpts, ground_index_matrix)
-    global_trigger[Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] |= trigger
+    global_trigger[Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] |= binary_xor
     global_ground_trigger[:, Qpts.start_id_x:Qpts.start_id_x+Qpts.matrix_order, Qpts.start_id_y:Qpts.start_id_y+Qpts.matrix_order] |= ground_trigger
     timer[4].stop()
     timer[5].stop()
 
-# extract all dynamic points from trigger matrix
+# extract all dynamic points from binary_xor matrix
 points_index2Remove = []
 for (i,j) in list(zip(*np.where(global_trigger != 0))):
     z = Mpts.binTo3id(global_trigger[i][j])
@@ -132,9 +124,8 @@ for (i,j) in list(zip(*np.where(global_trigger != 0))):
     for cid in range(len(global_ground_trigger)):
         gz = Mpts.binTo3id(global_ground_trigger[cid][i][j])
         for idgz in gz:
-            points_index2Remove += (Mpts.root_matrix[i][j].children[cid].children[idgz].pts_id).tolist()    # points_index2Remove = list(set(points_index2Remove))
+            points_index2Remove += (Mpts.root_matrix[i][j].children[cid].children[idgz].pts_id).tolist()
 print(f"There are {len(points_index2Remove)} pts to remove")
-print(f" running time: {time.time() - starttime}")
 
 # save static map
 points_index2Retain =np.setdiff1d(np.arange(len(Mpts.original_points)), points_index2Remove)
