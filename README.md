@@ -1,68 +1,93 @@
-BeautyMap
----
+<p align="center">
+  <h2 align="center">BeautyMap: Binary-Encoded Adaptable Ground Matrix for Dynamic Points Removal in Global Maps</h2>
+  <p align="center">
+    <a href="https://github.com/MKJia"><strong>Mingkai Jia</strong></a><sup>1,*</sup>&nbsp;&nbsp;&nbsp;
+    <a href="https://kin-zhang.github.io"><strong>Qingwen Zhang</strong></a><sup>2,*</sup>&nbsp;&nbsp;&nbsp;
+    <a href="https://github.com/byangw"><strong>Bowen Yang</strong></a><sup>1</sup>&nbsp;&nbsp;&nbsp;
+    <a href="http://zarathustr.github.io/"><strong>Jin Wu</strong></a><sup>1</sup>&nbsp;&nbsp;&nbsp;
+    <strong>Ming Liu</strong><sup>1</sup>&nbsp;&nbsp;&nbsp;
+    <a href="https://www.kth.se/profile/patric"><strong>Patric Jensfelt</strong></a><sup>2</sup>&nbsp;&nbsp;&nbsp;
+    <br />
+    <sup>*</sup><strong>Co-first author</strong>&nbsp;&nbsp;&nbsp; <sup>1</sup><strong>HKUST</strong>&nbsp;&nbsp;&nbsp; <sup>2</sup><strong>KTH</strong>&nbsp;&nbsp;&nbsp; 
+  </p>
+</p>
 
-Title: [RA-L'24] BeautyMap: Binary-Encoded Adaptable Ground Matrix for Dynamic Points Removal in Global Maps
+[![arXiv](https://img.shields.io/badge/arXiv-2405.07283-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2405.07283) [video coming soon] [poster coming soon]. Accepted by RA-L'24.
 
-Authors: Mingkai JIA, Qingwen ZHANG, ...
+## 0. Setup
+Available in Ubuntu, Windows and MacOS.
 
-Not only limited on the scenarios, point clouds are enough for remove! TESTED SENSOR: Velodyne-16, Velodyne-64, MEMS, Leica BLK360
-
-<!-- To improve the ERASOR in speed and remove theory in math. Check [Kin's notion page](https://www.notion.so/kinzhang/EDOMap-Eliminate-Dynamic-Obstacle-points-in-the-Global-map-ERASOR-6732884af87d430e9405c1e5e5c6ad73) for more detail improvement thinking.
-
-
-
-**<u>Test computer and System (Windows and Ubuntu):</u>**
-
-Desktop setting: i9-12900KF, GPU 3090, CUDA 11.3, cuDNN 8.2.1
-
-System setting: Ubuntu 20.04, ROS noetic (**<u>Python 3.8</u>**)
-
----
-
-Desktop setting: i7-9750H, GPU 1660Ti
-
-System setting: Windows 10 **<u>Python 3.8</u>**
-
----
-
-Desktop setting: Apple M2
-
-System setting: MacOS 13.0.1 **<u>Python 3.9</u>**
-
-Open3d version must be 15.1 otherwise [issue here](https://github.com/isl-org/Open3D/issues/1421#issuecomment-1402746225)
-
+[Conda](https://docs.conda.io/projects/miniconda/en/latest/)/[Mamba](https://github.com/mamba-org/mamba) is recommended.
 ```bash
-brew install libomp
-pip3 install -r requirments.txt
-pip3 install open3d==0.15.1
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
+
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
+bash Mambaforge-$(uname)-$(uname -m).sh
 ```
 
-## Install
-install dependencies libraries
+Python version tested: 3.8, 3.9, 3.10.
 ```bash
-pip install -r requirments.txt
+mamba create -n beautymap python=3.8
+mamba activate beautymap
+pip install -r requirements.txt
 ```
 
-run debug data (Three people behind the car):
+## 1. Run
+
+Prepare Data: Teaser data (KITTI 00: 384.4Mb) can be downloaded via follow commands, more data detail can be found in the [dataset section](https://github.com/KTH-RPL/DynamicMap_Benchmark?tab=readme-ov-file#dataset--scripts) or format your own dataset follow [custom dataset section](https://github.com/KTH-RPL/DynamicMap_Benchmark/blob/master/scripts/README.md#custom-dataset).
+
 ```bash
-python main_rushversion.py
-```
-ATTENTION: 如果有什么弹出的窗口，是因为现在还在调试阶段，请切换英文输入后，按下键盘：q 即可退出 继续运行后续!!
-
-rush version demo:
-Blue is global prior map (Cut a little bit for fast debug), Red is points want to delete, Black is Query Frame Point Cloud
-
-
-![](assets/RushVersion_Demo.png)
-
-## Others
-
-Some hints about point cloud data set:
-```bash
-print(f"{points.shape}")
-# [1394189,4](lecai) [25380, 4](16-velodyne) 
-# 4: (x, y, z, intensity)
+wget https://zenodo.org/records/8160051/files/00.zip
+unzip 00.zip -d data
 ```
 
-Issues:
-1. [https://stackoverflow.com/questions/52727700/sklearn-kmeans-convergence-warning](https://stackoverflow.com/questions/52727700/sklearn-kmeans-convergence-warning) -->
+Run:
+```bash
+# kitti
+python main.py --data_dir data/00 --dis_range 40 --xy_resolution 1 --h_res 0.5
+
+# semi-indoor
+python main.py --data_dir data/semindoor --dis_range 10 --xy_resolution 0.5 --h_res 0.2
+```
+
+Parameters explanation (Check our paper for more details):
+- `range`: from center point to an square.
+- `resolution`: resolution of the grid (x,y).
+- `h_res`: resolution of the grid (z).
+
+![beautymap](assets/demo.png)
+
+## 2. Evaluation
+
+Please reference to [DynamicMap_Benchmark](https://github.com/KTH-RPL/DynamicMap_Benchmark) for the evaluation of BeautyMap and comparison with other dynamic removal  methods.
+
+[Evaluation Section link](https://github.com/KTH-RPL/DynamicMap_Benchmark/blob/master/scripts/README.md#evaluation)
+
+
+### Citation
+
+This work was partially supported by the Wallenberg AI, Autonomous Systems and Software Program ([WASP](https://wasp-sweden.org/)) funded by the Knut and Alice Wallenberg Foundation.
+
+Please cite our works if you find these useful for your research.
+
+```
+@ARTICLE{jia2024beautymap,
+  author={Jia, Mingkai and Zhang, Qingwen and Yang, Bowen and Wu, Jin and Liu, Ming and Jensfelt, Patric},
+  journal={IEEE Robotics and Automation Letters}, 
+  title={BeautyMap: Binary-Encoded Adaptable Ground Matrix for Dynamic Points Removal in Global Maps}, 
+  year={2024},
+  volume={},
+  number={},
+  pages={1-8},
+  doi={10.1109/LRA.2024.3402625}
+}
+@inproceedings{zhang2023benchmark,
+  author={Zhang, Qingwen and Duberg, Daniel and Geng, Ruoyu and Jia, Mingkai and Wang, Lujia and Jensfelt, Patric},
+  booktitle={IEEE 26th International Conference on Intelligent Transportation Systems (ITSC)}, 
+  title={A Dynamic Points Removal Benchmark in Point Cloud Maps}, 
+  year={2023},
+  pages={608-614},
+  doi={10.1109/ITSC57777.2023.10422094}
+}
+```

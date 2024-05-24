@@ -1,9 +1,6 @@
 open3d
-scikit-learn
 scipy
-pandas
 matplotlib
-yaml
-json
 tqdm
 dztimer
+fire

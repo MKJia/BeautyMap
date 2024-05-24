@@ -71,7 +71,7 @@ class BEETree: # Binary-Encoded Eliminate Tree
                              min(self.original_points[...,1]),
                              min(self.original_points[...,2])])
         self.coordinate_offset = min_xyz
-        print(f"Min xyz: {min_xyz[0]}, {min_xyz[1]}, {min_xyz[2]} ")
+        print(f"[LOG] Min xyz: {min_xyz[0]}, {min_xyz[1]}, {min_xyz[2]} ")
         self.non_negtive_points = self.original_points[:,:3] - min_xyz
         self.non_negtive_center = self.center - min_xyz
 
@@ -80,9 +80,9 @@ class BEETree: # Binary-Encoded Eliminate Tree
         max_y = max(self.non_negtive_points[...,1])
         min_x = min(self.non_negtive_points[...,0])
         min_y = min(self.non_negtive_points[...,1])
-        print(f"Max/Min value on x: {max_x}/{min_x}, y: {max_y}/{min_y}")
+        print(f"[LOG] Max/Min value on x: {max_x}/{min_x}, y: {max_y}/{min_y}")
         self.matrix_order = max((max_x - min_x)/ self.unit_x, (max_y - min_y) / self.unit_y).astype(int) + 1
-        print(f"Matrix order: {self.matrix_order}")
+        print(f"[LOG] Matrix order: {self.matrix_order}")
         self.minz_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=float) + float("inf") # Only for map, once
 
     def generate_map_binary_tree(self):
