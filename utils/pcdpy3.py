@@ -1,14 +1,18 @@
+'''
 # Created: 2023-04-12 15:37
 # Copyright (C) 2023-now, RPL, KTH Royal Institute of Technology
 # Author: Kin ZHANG  (https://kin-zhang.github.io/)
-# Part of DUFOMap benchmark. Running in Python3.
+# Part of Dynamic Benchmark. Running in Python3.
 # Version: 1.0.0 (2023-04-12) Only read.
+# Version: 2.0.0 (2023-05-21) Add write with intensity involved.
+
 
 # This code is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
 # ---------------------------------------------------------------
 # First version: Read and write PCL .pcd files in python.
 # dimatura@cmu.edu, 2013-2018 Check https://github.com/dimatura/pypcd
+'''
 
 import re
 import warnings
@@ -20,7 +24,7 @@ def load_pcd(path):
     data.xyzi2np()
     return data
 
-def save_pcd(path, data: np.array, pos=np.array([0,0,0,1,0,0,0])):
+def save_pcd(path, data: np.array, pos=np.array([0,0,0,1,0,0,0]), rgb: np.array = None):
     # need be data: [N,3] or [N,4] [x,y,z,intensity]
     # pos: [x,y,z, qw,qx,qy,qz]
     # assert with print
@@ -51,13 +55,25 @@ def save_pcd(path, data: np.array, pos=np.array([0,0,0,1,0,0,0])):
             pc_data['y'] = data_float32[:, 1]
             pc_data['z'] = data_float32[:, 2]
             pc_data['intensity'] = data_float32[:, 3]
-        
+
+        elif(data.shape[1] == 3 and rgb is not None and data.shape[0] == rgb.shape[0]):
+            md['fields'].append('rgb')
+            md['size'].append(4)
+            md['type'].append('F')
+            md['count'].append(1)
+            pc_data = np.zeros(data_float32.shape[0], dtype=[('x', np.float32), ('y', np.float32), ('z', np.float32), ('rgb', np.uint32)])
+            pc_data['x'] = data_float32[:, 0]
+            pc_data['y'] = data_float32[:, 1]
+            pc_data['z'] = data_float32[:, 2]
+            rgb = rgb.astype(np.uint32)
+            pc_data['rgb'] = (rgb[:, 0] << 16) | (rgb[:, 1] << 8) | rgb[:, 2]
+
         elif(data.shape[1] == 3):
             pc_data = np.zeros(data_float32.shape[0], dtype=[('x', np.float32), ('y', np.float32), ('z', np.float32)])
             pc_data['x'] = data_float32[:, 0]
             pc_data['y'] = data_float32[:, 1]
             pc_data['z'] = data_float32[:, 2]
-
+        
         if pc_data is not None:
             pc = PointCloud(md, pc_data)
             point_cloud_to_fileobj(pc, fileobj)
@@ -262,3 +278,20 @@ def build_ascii_fmtstr(pc):
         else:
             raise ValueError("don't know about type %s" % t)
     return fmtstr
+
+
+# Other functions --------------------------------------------------------
+try:
+    from scipy.spatial.transform import Rotation as R
+except ImportError:
+    warnings.warn("scipy not found, some functions may not work")
+
+def xyzqwxyz_to_matrix(xyzqwxyz: list):
+    """
+    input: xyzqwxyz: [x, y, z, qx, qy, qz, qw] a list of 7 elements
+    """
+    rotation = R.from_quat([xyzqwxyz[4], xyzqwxyz[5], xyzqwxyz[6], xyzqwxyz[3]]).as_matrix()
+    pose = np.eye(4).astype(np.float64)
+    pose[:3, :3] = rotation
+    pose[:3, 3] = xyzqwxyz[:3]
+    return pose
