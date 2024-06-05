@@ -72,16 +72,16 @@ This work was partially supported by the Wallenberg AI, Autonomous Systems and S
 Please cite our works if you find these useful for your research.
 
 ```
-@ARTICLE{jia2024beautymap,
+@ARTICLE{10533672,
   author={Jia, Mingkai and Zhang, Qingwen and Yang, Bowen and Wu, Jin and Liu, Ming and Jensfelt, Patric},
   journal={IEEE Robotics and Automation Letters}, 
   title={BeautyMap: Binary-Encoded Adaptable Ground Matrix for Dynamic Points Removal in Global Maps}, 
   year={2024},
-  volume={},
-  number={},
-  pages={1-8},
-  doi={10.1109/LRA.2024.3402625}
-}
+  volume={9},
+  number={7},
+  pages={6256-6263},
+  doi={10.1109/LRA.2024.3402625}}
+
 @inproceedings{zhang2023benchmark,
   author={Zhang, Qingwen and Duberg, Daniel and Geng, Ruoyu and Jia, Mingkai and Wang, Lujia and Jensfelt, Patric},
   booktitle={IEEE 26th International Conference on Intelligent Transportation Systems (ITSC)}, 
