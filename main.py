@@ -81,7 +81,13 @@ def main(
         outlier_matrix_roi = Qpts.calculate_map_roi(Mpts.outlier_matrix)
 
         # query generation
-        Qpts.generate_query_binary_tree(minz_matrix_roi)
+        is_valid_frame = Qpts.generate_query_binary_tree(minz_matrix_roi)
+        if not is_valid_frame:
+            print(f"Skip the {file_cnt} frame: {pcd_file}. No query points in map range!")
+            print("Please check your data and MAKE SURE query frames are transformed into map coordinate")
+            timer[1].stop()
+            timer[5].stop()
+            continue
         Qpts.get_binary_matrix()
         timer[1].stop()
 

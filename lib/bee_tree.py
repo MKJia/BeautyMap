@@ -161,6 +161,8 @@ class BEETree: # Binary-Encoded Eliminate Tree
         points_in_map_frame = self.non_negtive_points - [self.start_xy[0], self.start_xy[1], 0]
         points_in_range_id = (points_in_map_frame[:, 0] >= 0) & (points_in_map_frame[:, 1] >= 0) & (points_in_map_frame[:, 0] < self.matrix_order*self.unit_x) & (points_in_map_frame[:, 1] < self.matrix_order*self.unit_y)
         points_in_range = points_in_map_frame[points_in_range_id]
+        if len(points_in_range) == 0:
+            return False
         idxy = (np.divide(points_in_range,[self.unit_x, self.unit_y, self.unit_z])).astype(int)[:,:2]
         ori_id = np.lexsort([idxy[:,1], idxy[:,0]])
         newidxy = idxy[ori_id]
@@ -198,6 +200,8 @@ class BEETree: # Binary-Encoded Eliminate Tree
             if (exists_overheight):
                 self.root_matrix[idx][idy].binary_data |= 1 << MAX_HEIGHT - 2
 
+        return True
+
     def get_binary_matrix(self):
         self.binary_matrix = np.zeros([self.matrix_order, self.matrix_order], dtype=int)
         for i in range(self.matrix_order):
@@ -215,6 +219,11 @@ class BEETree: # Binary-Encoded Eliminate Tree
                     self.minz_matrix[i][j] = self.root_matrix[i][j].min_z
 
     def transform_on_points(self, coordinate_offset):
+        # hotfix0717: tranform map points by viewpoint params
+        # NOTE: In our standard data pre-processing pipe, query frames need to be transormed into map coordinate!
+        # You can also note the follow line:225 to ALLOW viewpoint transformation for query frames
+        self.original_points[:,:3] -= self.sensor_origin_pose[:3]
+        # non-negtificate query points
         self.non_negtive_points = np.asarray(self.original_points[:,:3] - coordinate_offset)
         self.non_negtive_center = self.sensor_origin_pose[:3] - coordinate_offset
         tmp1 = self.non_negtive_points - self.non_negtive_center
