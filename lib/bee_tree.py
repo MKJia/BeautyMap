@@ -54,6 +54,7 @@ class BEETree: # Binary-Encoded Eliminate Tree
         PointCloudData = load_pcd(filename) # x, y, z, qw, qx, qy, qz
         self.sensor_origin_pose = np.array(list(PointCloudData.get_metadata()['viewpoint']))
         self.original_points = PointCloudData.np_data
+        self.original_points[:,:3] += self.sensor_origin_pose[:3] # hotfix0717: tranform map points by viewpoint params
         self.center = np.mean(self.original_points[:,:3],axis=0)
         self.start_xy = np.array([.0,.0]) # Only for map, once
 
